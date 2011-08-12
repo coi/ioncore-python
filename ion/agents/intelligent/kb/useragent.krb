@@ -1,0 +1,8 @@
+# $Id: useragent.krb 2008-08-02 pckediya $
+#
+#
+# Establish child_parent relationships:
+user_authorization_check
+    use authorized_user($org,$user_id,$role)
+    when
+    	useragent_facts.role_map($org,$role,$user_id)

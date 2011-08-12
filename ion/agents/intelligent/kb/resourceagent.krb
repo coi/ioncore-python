@@ -1,0 +1,8 @@
+# $Id: user_agent.krb 2008-08-02 pckediya $
+#
+#
+# Establish child_parent relationships:
+resource_authorization_check
+    use authorized_resource($org,$role,$resource_id,$operation,$permission)
+    when
+    	resourceagent_facts.resource_authorization($org,$role,$resource_id,$operation,$permission)

@@ -1,0 +1,6 @@
+# $Id: resourceagent.kfb 2011-08-01 pckediya $
+# coding=utf-8
+
+# resourceagent.resource_authorization($org,$role,$resource_id,$operation,$permission)
+resource_authorization(ooi,researcher,glider55,get_temp,granted)
+

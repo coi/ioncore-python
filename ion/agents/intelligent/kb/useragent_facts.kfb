@@ -1,0 +1,5 @@
+# $Id: useragent.kfb 2011-08-01 pckediya $
+# coding=utf-8
+
+# useragent.role_map($org,$role,$user_id)
+role_map(ooi,researcher,ANONYMOUS)
