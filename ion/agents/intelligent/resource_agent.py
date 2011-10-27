@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/hello_service.py
-@author Michael Meisinger
+@file ion/agent/intelligent/ressource_agent.py
+@author Prashant Kediyal
 @brief An example service definition that can be used as template.
 """
 

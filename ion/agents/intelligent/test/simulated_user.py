@@ -1,12 +1,10 @@
 #!/usr/bin/env python
 
 """
-@file ion/play/test/test_hello.py
-@test ion.play.hello_service Example unit tests for sample code.
-@author Michael Meisinger
+@file ion/agent/intelligent/test/simulated_user.py
+@author Prashant Kediyal
+@brief Invokes test cases on a user_agent and resource_agent
 """
-import time
-
 
 from twisted.internet import defer
 
@@ -15,13 +13,10 @@ from ion.test.iontest import IonTestCase
 import ion.util.ionlog
 from ion.core import ioninit
 
-import sys
-#change the path to point to where the plugins are actually installed - usually the  most recent version - then uncomment the next two lines
-#sys.path.append('/Applications/eclipse/plugins/org.python.pydev.debug_2.1.0.2011052613/pysrc')
-#import pydevd
 
 log = ion.util.ionlog.getLogger(__name__)
 CONF = ioninit.config(__name__)
+
 
 class UserTest(IonTestCase):
     """
@@ -57,7 +52,7 @@ class UserTest(IonTestCase):
         log.info(str(permit_decision))
         print
         print
-        
+
     @defer.inlineCallbacks
     def test_unauthorized_user(self):
         log.debug('test_unauthorized_user')
@@ -80,7 +75,7 @@ class UserTest(IonTestCase):
 
     @defer.inlineCallbacks
     def test_authorized_user_unauthorized_resource(self):
-        log.debug('test_unauthorized_user')
+        log.debug('test_unauthorized_user_unauthorized_resource')
         services = [
             {'name':'useragent','module':'ion.agents.intelligent.user_agent','class':'UserAgentService'},
             {'name':'resourceagent','module':'ion.agents.intelligent.resource_agent','class':'ResourceAgentService'},
@@ -95,5 +90,5 @@ class UserTest(IonTestCase):
         permit_decision = yield uasc.service_request(request_content)
         log.info(str(permit_decision))
         print
-        print             
+        print
 

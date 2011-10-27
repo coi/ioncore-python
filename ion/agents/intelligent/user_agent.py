@@ -35,7 +35,7 @@ class UserAgentService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_service_request(self, request_content, headers, msg):
-        log.info('op_service_request: '+str(request_content))       
+        log.info('op_service_request content: '+str(request_content))
         policy_response = policy_support.check(headers)
         if policy_response!='denied':
             rasc = ResourceAgentServiceClient()
