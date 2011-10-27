@@ -2,7 +2,7 @@
 
 """
 @file ion/core/intercept/policy.py
-@author Michael Meisinger
+@author Prashant Kediyal
 @brief Policy checking interceptor
 """
 
@@ -30,6 +30,9 @@ from ion.services.dm.inventory.association_service import IDREF_TYPE
 from ion.core.messaging.message_client import MessageClient
 
 from google.protobuf.internal.containers import RepeatedScalarFieldContainer
+
+from ion.core.xacml import request
+from ndg.xacml.core.context.result import Decision
 
 CONF = ioninit.config(__name__)
 # Master set of roles and their user-friendly names
@@ -225,7 +228,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
             log.error("Policy Interceptor: Rejecting improperly defined message missing receiver [%s]." % str(msg))
             invocation.drop(note='Error: no receiver defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             defer.returnValue(invocation)
-        if not 'op'in msg:
+        if not 'op' in msg:
             log.error("Policy Interceptor: Rejecting improperly defined message missing op [%s]." % str(msg))
             invocation.drop(note='Error: no op defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             defer.returnValue(invocation)
@@ -251,6 +254,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
         operation = msg['op']
 
         log.info('Policy Interceptor: Authorization request for service [%s] operation [%s] user_id [%s] expiry [%s]' % (service, operation, user_id, expiry))
+
         if service in policy_dictionary:
             service_list = policy_dictionary[service]
             # TODO figure out how to handle non-wildcard resource ids
@@ -298,7 +302,22 @@ class PolicyInterceptor(EnvelopeInterceptor):
             else:
                 log.info('Policy Interceptor: operation not in policy dictionary.')
         else:
-            log.info('Policy Interceptor: service not in policy dictionary.')
+            if service == 'hello_resource' and operation=='create_instrument_resource':
+                #TODO get all the roles for a user
+                #user_roles=[]
+                #for role in role_user_dict:
+                #    if user_id in role_user_dict[role]['ooi_id']:
+                #        user_roles.append(user_id)
+                #    derived_data['roles']=user_roles
+                #TODO get all the resources in the request
+                log.debug('checking XACML policy for message: '+ str(msg))
+                permitted=False
+                yield self.check_policies(msg,invocation,permitted)
+                if permitted:
+                    log.info('Policy Interceptor: Returning Authorized.')
+                else:
+                    log.info('Policy Interceptor: Returning Not Authorized.')
+                    defer.returnValue(invocation)
 
         expiry_time = int(expiry)
         if (expiry_time > 0):
@@ -311,6 +330,31 @@ class PolicyInterceptor(EnvelopeInterceptor):
 
         log.info('Policy Interceptor: Returning Authorized.')
         defer.returnValue(invocation)
+
+    @defer.inlineCallbacks
+    def check_policies(self,msg,invocation,permitted):
+        requestCtx = request._createRequestCtx(msg)
+        log.debug('request context created')
+        pdp = request._createPDP()
+        log.debug('pdp created')
+        response = pdp.evaluate(requestCtx)
+        log.debug('pdp evaluated response')
+        if response is None:
+            log.debug('response from PDP contains nothing')
+            invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
+        else:
+            for result in response.results:
+                if result.decision != Decision.PERMIT_STR:
+                    break
+            if result.decision != Decision.PERMIT_STR:
+                permitted=False
+                invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
+            else:
+                permitted=True
+        log.info('XACML Policy Interceptor: '+str(result.decision))
+        return
+        defer.returnValue(invocation)
+        yield (1,)
 
     @defer.inlineCallbacks
     def check_owner(self, user_id, uuid_list, invocation):

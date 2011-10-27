@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Policy xmlns="urn:oasis:names:tc:xacml:2.0:policy:schema:os"
+    xmlns:xacml-context="urn:oasis:names:tc:xacml:2.0:context:schema:os"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="urn:oasis:names:tc:xacml:2.0:policy:schema:os http://docs.oasis-open.org/xacml/access_control-xacml-2.0-policy-schema-os.xsd"
+    xmlns:xf="http://www.w3.org/TR/2002/WD-xquery-operators-20020816/#"
+    xmlns:md="http:www.med.example.com/schemas/record.xsd"
+    PolicyId="urn:oasis:names:tc:xacml:2.0:example:policyid:1"
+    RuleCombiningAlgId="urn:oasis:names:tc:xacml:1.0:rule-combining-algorithm:deny-overrides">
+
+    <PolicyDefaults>
+        <XPathVersion>http://www.w3.org/TR/1999/Rec-xpath-19991116</XPathVersion>
+    </PolicyDefaults>
+
+    <Target>
+        <Resources>
+            <Resource>
+                <ResourceMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                     <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">hello_resource</AttributeValue>
+                     <ResourceAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:resource:service-provider" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                </ResourceMatch>
+            </Resource>
+        </Resources>
+    </Target>
+<!-- VariableDefinition is not currently implemented 29/03/10
+    <VariableDefinition VariableId="17590035">
+        <Apply FunctionId="urn:oasis:names:tc:xacml:2.0:function:date-less-or-equal">
+            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:date-one-and-only">
+                <EnvironmentAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:environment:current-date" DataType="http://www.w3.org/2001/XMLSchema#date"/>
+            </Apply>
+            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:date-add-yearMonthDuration">
+                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:date-one-and-only">
+                    <AttributeSelector RequestContextPath="//xacml-context:Resource/xacml-context:ResourceContent/md:record/md:patient/md:patientDoB/text()" DataType="http://www.w3.org/2001/XMLSchema#date"/>
+                </Apply>
+                <AttributeValue DataType="http://www.w3.org/TR/2002/WD-xquery-operators-20020816#yearMonthDuration">
+                    <xf:dt-yearMonthDuration>
+                        P16Y
+                    </xf:dt-yearMonthDuration>
+                </AttributeValue>
+            </Apply>
+        </Apply>
+    </VariableDefinition>
+   -->
+    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:1" Effect="Permit">
+        <Description>
+            request for operation create_instrument_resource on service hello resource
+            should not be allowed to anonymous users
+        </Description>
+        <Target>
+            <Actions>
+                <Action>
+                    <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">create_instrument_resource</AttributeValue>
+                        <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </ActionMatch>
+                </Action>
+            </Actions>
+        </Target>
+        <Condition>
+            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                    <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
+                        <SubjectAttributeDesignator
+                         AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id"
+                         DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </Apply>
+                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">ANONYMOUS</AttributeValue>
+            </Apply>
+        </Condition>
+    </Rule>
+</Policy>
