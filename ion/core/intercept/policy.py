@@ -311,9 +311,9 @@ class PolicyInterceptor(EnvelopeInterceptor):
                 #    derived_data['roles']=user_roles
                 #TODO get all the resources in the request
                 log.debug('checking XACML policy for message: '+ str(msg))
-                permitted=False
-                yield self.check_policies(msg,invocation,permitted)
-                if permitted:
+                decision={'permit':False}
+                yield self.check_policies(msg,invocation,decision)
+                if decision['permit']:
                     log.info('Policy Interceptor: Returning Authorized.')
                 else:
                     log.info('Policy Interceptor: Returning Not Authorized.')
@@ -332,7 +332,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
         defer.returnValue(invocation)
 
     @defer.inlineCallbacks
-    def check_policies(self,msg,invocation,permitted):
+    def check_policies(self,msg,invocation,decision):
         requestCtx = request._createRequestCtx(msg)
         log.debug('request context created')
         pdp = request._createPDP()
@@ -344,15 +344,14 @@ class PolicyInterceptor(EnvelopeInterceptor):
             invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
         else:
             for result in response.results:
-                if result.decision != Decision.PERMIT_STR:
+                if str(result.decision) == Decision.DENY_STR:
                     break
-            if result.decision != Decision.PERMIT_STR:
-                permitted=False
+            if str(result.decision) == Decision.DENY_STR:
+                decision['permit']=False
                 invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
             else:
-                permitted=True
-        log.info('XACML Policy Interceptor: '+str(result.decision))
-        return
+                decision['permit']=True
+        log.info('XACML Policy Interceptor permission: '+str(decision['permit']))
         defer.returnValue(invocation)
         yield (1,)
 
