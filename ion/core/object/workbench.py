@@ -28,8 +28,7 @@ import weakref
 
 # Static entry point for "thread local" context storage during request
 # processing, eg. to retaining user-id from request message
-from ion.core.ioninit import request
-from net.ooici.core.container import container_pb2
+#from net.ooici.core.container import container_pb2
 
 
 from ion.util.cache import LRUDict
@@ -66,6 +65,8 @@ PUSH_MESSAGE_TYPE  = object_utils.create_type_identifier(object_id=41, version=1
 
 BLOBS_REQUSET_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=51, version=1)
 BLOBS_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=52, version=1)
+GET_LCS_REQUEST_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=58, version=1)
+GET_LCS_RESPONSE_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=59, version=1)
 
 DATA_REQUEST_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=53, version=1)
 DATA_REPLY_MESSAGE_TYPE = object_utils.create_type_identifier(object_id=54, version=1)
@@ -92,6 +93,11 @@ class WorkBench(object):
 
         # A Cache of repositories that holds upto a certain size between op message calls.
         self._repo_cache = LRUDict(cache_size, use_size=True)
+
+
+        # Set a default value for Purging Previous States
+        # It must be possible to turn this off for certain workbench tests.
+        self._purge_previous = True
 
 
         """
@@ -132,18 +138,32 @@ class WorkBench(object):
 
         trouble = False
         convid=None
+        convids = set()
         for repo in self._repos.itervalues():
 
             if convid is None and repo.persistent is False:
                 convid = repo.convid_context
+                convids.add(repo.convid_context)
             elif convid != repo.convid_context and repo.persistent is False:
                 trouble = True
-                break
+                convids.add(repo.convid_context)
 
         if trouble:
-            return str(self)
+            return str('Workbench Cache is holding %d repositories in %d conversations' % (len(self._repos), len(convids)) )
         else:
             return 'Workbench Cache is clear!'
+
+    def count_persistent(self):
+        nrepos = len(self._repos)
+        count = 0
+        if  nrepos > 0:
+
+            for repo in self._repos.itervalues():
+                if repo.persistent is True:
+                    count +=1
+        return count
+
+
 
 
     def create_repository(self, root_type=None, nickname=None, repository_key=None, persistent=False):
@@ -303,9 +323,14 @@ class WorkBench(object):
         # Delete it from the deterministically held repo dictionary
         del self._repos[key]
 
+        # Can only do this if we are not testing the work bench class without persistence
+        if self._purge_previous is True:
+            repo.purge_previous_states()
+
         repo.purge_workspace()
 
         repo.purge_associations()
+
 
         # Move it to the cached repositories
         self._repo_cache[key] = repo
@@ -325,7 +350,7 @@ class WorkBench(object):
             if repo.persistent is True:
                 continue
 
-            if repo.convid_context == convid_context or repo.convid_context is None:
+            if repo.convid_context == convid_context or convid_context is None:
 
                 if repo.cached is False:
                     self.clear_repository(repo)
@@ -369,10 +394,10 @@ class WorkBench(object):
         repo.index_hash.cache = self._workbench_cache
         repo._process = self._process
 
-        wc = request.get('workbench_context',[])
-
-        repo.convid_context = pu.get_last_or_default(wc, 'Default Context')
-
+        try:
+            repo.convid_context = self._process.context.get('progenitor_convid')
+        except AttributeError, ae:
+            log.warn('Workbench Process (%s) does not have have a context object!' % self._process)
        
     def reference_repository(self, repo_key, current_state=False):
 
@@ -509,7 +534,16 @@ class WorkBench(object):
         else:
             cloning = False
             # If we have a current version - get the list of commits
-            commit_list = self.list_repository_commits(repo)
+            #commit_list = self.list_repository_commits(repo)
+
+            if get_head_content:
+                # Add all blobs to the commit list - not just the commits...
+                commit_list = self.list_repository_blobs(repo)
+            else:
+                # We are only concerned with the commits...
+                commit_list = self.list_repository_commits(repo)
+
+
 
         # set excluded types on this repository
         if excluded_types is not None:
@@ -658,10 +692,15 @@ class WorkBench(object):
             blobs = self._get_blobs(response.Repository, keys, filtermethod)
 
             for element in blobs.itervalues():
-                link = response.blob_elements.add()
-                obj = response.Repository._wrap_message_object(element._element)
 
-                link.SetLink(obj)
+                # Hold onto any keys that we just loaded for a pull request...
+                repo.keys_to_keep.add(element.key)
+
+                if element.key not in puller_has:
+                    link = response.blob_elements.add()
+                    obj = response.Repository._wrap_message_object(element._element)
+
+                    link.SetLink(obj)
 
             log.debug('Added blobs to the response')
 
@@ -843,6 +882,9 @@ class WorkBench(object):
                     raise WorkBenchError('Requested push to a repository is in an invalid state.', request.ResponseCodes.BAD_REQUEST)
                 repo_keys = set(self.list_repository_blobs(repo))
 
+            # Hold onto any keys that the remote is trying to push...
+            repo.keys_to_keep = set(repostate.blob_keys)
+
             # Get the set of keys in repostate that are not in repo_keys
             need_keys = set(repostate.blob_keys).difference(repo_keys)
 
@@ -975,38 +1017,10 @@ class WorkBench(object):
         The return value is a list of binary SHA1 keys
         """
 
-        '''
-        if repo.status == repo.MODIFIED:
-            log.warn('Automatic commit called during pull. Commit should be called first!')
-            comment='Commiting to send message with wrapper object'
-            repo.commit(comment=comment)
-        '''
-        
-        cref_set = set()
-        for branch in repo.branches:
 
-            for cref in branch.commitrefs:
-                cref_set.add(cref)
+        # Just use the commit index dictionary...
+        key_list = repo._commit_index.keys()
 
-        key_set = set()
-
-        while len(cref_set)>0:
-            new_set = set()
-
-            for cref in cref_set:
-
-                if cref.MyId not in key_set:
-                    key_set.add(cref.MyId)
-
-                    for prefs in cref.parentrefs:
-                        new_set.add(prefs.commitref)
-
-
-            # Now recurse on the ancestors
-            cref_set = new_set
-
-        key_list = []
-        key_list.extend(key_set)
         return key_list
 
     def list_repository_blobs(self, repo):
@@ -1016,20 +1030,18 @@ class WorkBench(object):
 
         The method is a bit trivial - candidate for removal!
         """
-        '''
-        if repo.status == repo.MODIFIED:
-            log.warn('Automatic commit called during push. Commit should be called first!')
-            comment='Commiting to push repo.'
-            repo.commit(comment=comment)
-        '''
+
 
         return repo.index_hash.keys()
 
 
-    def _update_repo_to_head(self, repo, head):
+    def _update_repo_to_head(self, repo, head, truncate_commits=True, loaded_commits=None):
         log.debug('_update_repo_to_head: Loading a repository!')
 
         existing_commits = repo._commit_index.copy()
+
+        if loaded_commits is not None:
+            repo._commit_index.update(loaded_commits)
 
         log.info('Running load commits...')
         loaded={}
@@ -1038,19 +1050,37 @@ class WorkBench(object):
                 self._load_commits(link,loaded=loaded)
 
         if repo._dotgit == head:
-            return
 
-        if len(repo.branches) == 0:
+            for i in reversed(range(len(head.branches))):
+                del head.branches[i]
+
+            head.Invalidate()
+
+        elif len(repo.branches) == 0:
             # if we are doing a clone - pulling a new repository
+
+            # no need to delete the branches - there are not any!
+            repo._dotgit.Invalidate()
+
             repo._dotgit = head
             if len(repo.branches)>1:
                 log.warn('Do not assume branch order is unchanged - setting master to branch 0 anyways!')
             repo.branchnicknames['master']=repo.branches[0].branchkey
-            return
-        
-        # The current repository state must be merged with the new head.
-        self._merge_repo_heads(repo._dotgit, head, existing_commits=existing_commits)
 
+        else:
+            # The current repository state must be merged with the new head.
+            self._merge_repo_heads(repo._dotgit, head, existing_commits=existing_commits)
+
+            for i in reversed(range(len(head.branches))):
+                del head.branches[i]
+
+            head.Invalidate()
+
+        if truncate_commits:
+            repo.truncate_commits()
+
+            
+        return
 
 
     def _merge_repo_heads(self, existing_head, new_head, existing_commits=None):
@@ -1134,6 +1164,33 @@ class WorkBench(object):
                         found = True
                         existing_link.key = new_link.key # Cheat and just copy the key!
 
+                        continue
+
+
+                    #### Check to see if the history has been truncated since the last time we pulled.
+
+                    # Get the oldest of the new commits
+                    pref = new_cref
+                    cref_count = 0
+                    while pref.parentrefs:
+                        cref_count +=1
+                        pref_obj = pref.parentrefs[0]
+                        try:
+                            pref = pref_obj.commitref
+                        except KeyError:
+                            log.debug('Commit history is truncated... found oldest commit')
+                            break
+
+                    log.warn('REPO (%s) Branch Syncing: newest existing commit date - %s, oldest new commit date - %s, new commit ref count - %d ' % (repo.repository_key, existing_cref.date, pref.date, cref_count))
+
+                    if pref.date > existing_cref.date and cref_count > 10:
+                        # If all these new commits - and there better be at least 10 of them... are newer than the newest
+                        # existing commit - assume that it is not a merge but just a gap in the history!
+                        found = True
+                        existing_link.key = new_link.key
+
+
+
                     # Anything state that is not caught by these three options is
                     # resolved in the else of the for loop by adding this divergent
                     # state to the existing (local) repositories branch
@@ -1183,11 +1240,11 @@ class WorkBench(object):
 
         try:
             cref = repo.get_linked_object(link)
-        except repository.RepositoryError, ex:
-            log.exception(str(repo))
-            raise WorkBenchError('Commit id not found while loading commits: \n %s' % link.key)
+        except KeyError:
+            log.info('Commit history has been truncated!')
             # This commit ref was not actually sent!
-
+            return
+        
         if cref.ObjectType != COMMIT_TYPE:
             raise WorkBenchError('This method should only load commits!')
 
@@ -1195,8 +1252,14 @@ class WorkBench(object):
 
         for parent in cref.parentrefs:
             link = parent.GetLink('commitref')
+
             # load the linked object no matter what to realize parent child relationships
-            obj = repo.get_linked_object(link)
+            try:
+                obj = repo.get_linked_object(link)
+            except KeyError:
+                log.info('Commit history has been truncated!')
+                return
+
 
             # Call this method recursively for each link
             if link.key not in loaded:

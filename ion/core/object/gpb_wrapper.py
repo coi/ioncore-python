@@ -768,7 +768,7 @@ class Wrapper(object):
 
         elif self.IsRoot:
             # If this is a straight invalidation - clear the derived wrappers if root
-            for item in self.DerivedWrappers.values():
+            for item in self.DerivedWrappers.itervalues():
                 item.Invalidate()
 
         # Source must always be set to self or another gpb_wrapper object!
@@ -1005,7 +1005,7 @@ class Wrapper(object):
 
         self.recurse_count.count += 1
         local_cnt = self.recurse_count.count
-        log.debug('Entering Recurse Commit: recurse counter - %d, Object Type - %s, child links - %d, objects to commit - %d:\n %s' %
+        log.debug('Entering Recurse Commit: recurse counter - %d, Object Type - %s, child links - %d, objects to commit - %d, Modified - %s' %
               (local_cnt, type(self), len(self.ChildLinks), len(structure), self.Modified))
 
         if not  self.Modified:
@@ -1304,7 +1304,7 @@ class Wrapper(object):
         output += 'Wrapper IsRoot: %s \n' % str(self._root is self)
 
         # This is dangerous - this can result in an exception loop!
-        if hasattr(self._repository, '_dotgit') and not self._repository._dotgit.Invalid:
+        if hasattr(self._repository, '_dotgit') and self._repository._dotgit is not None and not self._repository._dotgit.Invalid:
             output += 'Repository: %s \n' % str(self._repository.repository_key)
         else:
             output += 'Repository: %s \n' % str(self._repository)
@@ -1606,8 +1606,8 @@ class ContainerWrapper(object):
 
     def Invalidate(self, source=None):
         self._gpbcontainer = None
-        if source is not None:
-            self._source = source
+        self._source = source
+        self.Repository = None
 
     @GPBSourceCW
     def __setitem__(self, key, value):
@@ -1858,8 +1858,9 @@ class ScalarContainerWrapper(object):
 
     def Invalidate(self, source=None):
         self._gpbcontainer = None
-        if source is not None:
-            self._source = source
+        self._source = source
+        self.Repository = None
+
 
     @GPBSourceSCW
     def append(self, value):
@@ -2083,8 +2084,11 @@ class StructureElement(object):
     def __str__(self):
         msg = ''
         if len(self._element.key) == 20:
-            msg = 'Hexkey: "' + sha1_to_hex(self._element.key) + '"\n'
-        return msg + self._element.__str__()
+            msg =   'Key:    ' + sha1_to_hex(self._element.key) + '\n'
+        msg = msg + 'Type:   ' + str(self._element.type) + '\n'
+        msg = msg + 'IsLeaf: ' + str(self._element.isleaf) + '\n'
+        msg = msg + 'El Len: ' + str(self.__sizeof__())
+        return msg
 
     def serialize(self):
         return self._element.SerializeToString()

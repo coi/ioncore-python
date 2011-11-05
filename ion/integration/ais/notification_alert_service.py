@@ -87,6 +87,8 @@ class NotificationAlertService(ServiceProcess):
         index_store_class_name = self.spawn_args.get('index_store_class', CONF.getValue('index_store_class', default='ion.core.data.store.IndexStore'))
         
         self.MailServer = CONF.getValue('mail_server', default='mail.oceanobservatories.org')
+        self.update_event_queue_name = CONF.getValue('update_event_queue_name', default='nas_update_event')
+        self.offline_event_queue_name = CONF.getValue('offline_event_queue_name', default='nas_offline_event')
         
         self.index_store_class = pu.get_class(index_store_class_name)
         self._storage_conf = get_cassandra_configuration()
@@ -123,14 +125,14 @@ class NotificationAlertService(ServiceProcess):
 
         # Create the subscribers for the event handlers
 
-        self.sub = DatasetSupplementAddedEventSubscriber(process=self)
+        self.sub = DatasetSupplementAddedEventSubscriber(process=self, queue_name=self.update_event_queue_name)
         self.sub.ondata = self.handle_update_event                     # need to do something with the data when it is received
         yield self.sub.initialize()
         yield self.sub.activate()
         log.info('NotificationAlertService.slc_init DatasetSupplementAddedEventSubscriber activation complete')
 
 
-        self.sub = DatasourceUnavailableEventSubscriber(process=self)
+        self.sub = DatasourceUnavailableEventSubscriber(process=self, queue_name=self.offline_event_queue_name)
         self.sub.ondata = self.handle_offline_event                    # need to do something with the data when it is received
         yield self.sub.initialize()
         yield self.sub.activate()
@@ -140,11 +142,12 @@ class NotificationAlertService(ServiceProcess):
     @defer.inlineCallbacks
     def handle_offline_event(self, content):
         log.info('NotificationAlertService.handle_offline_event notification event received ')
-        log.info('NotificationAlertService.handle_offline_event content   : %s', content)
+        log.debug('NotificationAlertService.handle_offline_event content   : %s', content)
         msg = content['content'];
+        log.debug('NotificationAlertService.handle_offline_event msg.additional_data.dataset_id   : %s', msg.additional_data.dataset_id)
+        log.debug('NotificationAlertService.handle_offline_event msg.additional_data.datasource_id   : %s', msg.additional_data.datasource_id)
 
         # build the email from the event content
-        SUBJECT = "ION Data Alert for data resource " +  msg.additional_data.datasource_id
         BODY = string.join(("This data resource is currently unavailable.",
                             "",
                             "Explanation: %s" %  msg.additional_data.error_explanation,
@@ -154,7 +157,10 @@ class NotificationAlertService(ServiceProcess):
 
         # get the list of subscriptions for this datasource
         query = Query()
-        query.add_predicate_eq('data_src_id', msg.additional_data.datasource_id)
+        ### Hack - uses dataset id in the data_src_id field because that is what AIS/UI use.
+        #query.add_predicate_eq('data_src_id', msg.additional_data.datasource_id)
+        query.add_predicate_eq('data_src_id', msg.additional_data.dataset_id)
+
         rows = yield self.index_store.query(query)
         log.info("NotificationAlertService.handle_offline_event  Rows returned %s " % (rows,))
 
@@ -163,6 +169,13 @@ class NotificationAlertService(ServiceProcess):
         # send notification email to each user that is monitoring this dataset
         for key, row in rows.iteritems():
             log.info("NotificationAlertService.handle_offline_event  First row data set id %s", rows[key]['data_src_id'] )
+            if rows[key]['dispatcher_script_path'] == "AutomaticallyCreatedInitialIngestionSubscription":
+                InitialIngestion = True
+                SUBJECT = "(SysName " + self.sys_name + ") ION Initial Ingestion Data Alert for data set " +  msg.additional_data.dataset_id
+            else:
+                InitialIngestion = False
+                SUBJECT = "(SysName " + self.sys_name + ") ION Data Alert for data set " +  msg.additional_data.dataset_id
+            log.info('NotificationAlertService.handle_update_event: ' + SUBJECT)
 
             tempTbl = {}
             # get the user information from the Identity Registry
@@ -179,25 +192,26 @@ class NotificationAlertService(ServiceProcess):
                 FROM = ION_DATA_ALERTS_EMAIL_ADDRESS
                 TO = tempTbl['user_email']
 
-                msg = MIMEText(BODY)
-                msg['Subject'] = SUBJECT
-                msg['From'] = FROM
-                msg['To'] = ', '.join([TO])
+                emsg = MIMEText(BODY)
+                emsg['Subject'] = SUBJECT
+                emsg['From'] = FROM
+                emsg['To'] = ', '.join([TO])
                     
                 try:
                     log.debug("NotificationAlertService.handle_offline_event sending email to %s using the mail server at %s" %(TO, self.MailServer))
-                    yield self._sendmail(self.MailServer, FROM, [TO], msg)
+                    yield self._sendmail(self.MailServer, FROM, [TO], emsg)
                     log.info('NotificationAlertService.handle_offline_event Successfully sent email' )
                 except SMTPClientError:
                     log.info('NotificationAlertService.handle_offline_event Error: unable to send email')
                 except Exception, ex:
                     log.warning('NotificationAlertService.handle_offline_event Error: unable to send email - %s' %str(ex))
 
+                ## Do not delete the initial notification for an unavailable!
                 # delete subscription if it was automatically created by the AIS for an initial ingestion at
                 # dataset creation
-                if rows[key]['dispatcher_script_path'] == "AutomaticallyCreatedInitialIngestionSubscription":
-                    yield self.index_store.remove(rows[key]['data_src_id'] + rows[key]['user_ooi_id'])
-                    log.info('NotificationAlertService.handle_offline_event deleted InitialIngestionSubscription for ' + rows[key]['data_src_id'])
+                #if InitialIngestion == True:
+                #    yield self.index_store.remove(rows[key]['data_src_id'] + rows[key]['user_ooi_id'])
+                #    log.info('NotificationAlertService.handle_offline_event deleted InitialIngestionSubscription for ' + rows[key]['data_src_id'])
 
                 log.info('NotificationAlertService.handle_offline_event completed ')
 
@@ -205,16 +219,16 @@ class NotificationAlertService(ServiceProcess):
     @defer.inlineCallbacks
     def handle_update_event(self, content):
         log.info('NotificationAlertService.handle_update_event notification event received')
-        log.info('NotificationAlertService.handle_update_event content   : %s', content)
+        log.debug('NotificationAlertService.handle_update_event content   : %s', content)
         msg = content['content']
+        log.debug('NotificationAlertService.handle_update_event msg.additional_data.dataset_id   : %s', msg.additional_data.dataset_id)
+        log.debug('NotificationAlertService.handle_update_event msg.additional_data.datasource_id   : %s', msg.additional_data.datasource_id)
         
         # build the email from the event content
         startdt = str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.start_datetime_millis/1000))))
         enddt =  str( datetime.fromtimestamp(time.mktime(time.gmtime(msg.additional_data.end_datetime_millis/1000))) )
         steps =  str(msg.additional_data.number_of_timesteps)
         log.info('NotificationAlertService.handle_update_event START and END time: %s    %s ', startdt, enddt)
-        SUBJECT = "ION Data Alert for data resource " +  msg.additional_data.datasource_id
-        log.info('NotificationAlertService.handle_update_event: ' + SUBJECT)
 
         BODY = string.join((
                         "Additional data have been received.",
@@ -230,7 +244,10 @@ class NotificationAlertService(ServiceProcess):
 
         # get the list of subscriptions for this datasource
         query = Query()
-        query.add_predicate_eq('data_src_id', msg.additional_data.datasource_id)
+        ### Hack - uses dataset id in the data_src_id field because that is what AIS/UI use.
+        #query.add_predicate_eq('data_src_id', msg.additional_data.datasource_id)
+        query.add_predicate_eq('data_src_id', msg.additional_data.dataset_id)
+
         rows = yield self.index_store.query(query)
         log.info("NotificationAlertService.handle_update_event  Rows returned %s " % (rows,))
 
@@ -239,6 +256,13 @@ class NotificationAlertService(ServiceProcess):
         # send notification email to each user that is monitoring this dataset
         for key, row in rows.iteritems():
             log.info("NotificationAlertService.handle_update_event  First row data set id %s", rows[key]['data_src_id'] )
+            if rows[key]['dispatcher_script_path'] == "AutomaticallyCreatedInitialIngestionSubscription":
+                InitialIngestion = True
+                SUBJECT = "(SysName " + self.sys_name + ") ION Initial Ingestion Data Alert for data set " +  msg.additional_data.dataset_id
+            else:
+                InitialIngestion = False
+                SUBJECT = "(SysName " + self.sys_name + ") ION Data Alert for data set " +  msg.additional_data.dataset_id
+            log.info('NotificationAlertService.handle_update_event: ' + SUBJECT)
 
             tempTbl = {}
             # get the user information from the Identity Registry
@@ -254,14 +278,14 @@ class NotificationAlertService(ServiceProcess):
                 FROM = ION_DATA_ALERTS_EMAIL_ADDRESS
                 TO = tempTbl['user_email']
 
-                msg = MIMEText(BODY)
-                msg['Subject'] = SUBJECT
-                msg['From'] = FROM
-                msg['To'] = ', '.join([TO])
+                emsg = MIMEText(BODY)
+                emsg['Subject'] = SUBJECT
+                emsg['From'] = FROM
+                emsg['To'] = ', '.join([TO])
 
                 try:
                     log.debug("NotificationAlertService.handle_update_event: sending email to %s using the mail server at %s" %(TO, self.MailServer))
-                    yield self._sendmail(self.MailServer, FROM, [TO], msg)
+                    yield self._sendmail(self.MailServer, FROM, [TO], emsg)
                     log.info('NotificationAlertService.handle_update_event Successfully sent email' )
                 except SMTPClientError:
                     log.info('NotificationAlertService.handle_update_event Error: unable to send email')
@@ -270,7 +294,7 @@ class NotificationAlertService(ServiceProcess):
 
                 # delete subscription if it was automatically created by the AIS for an initial ingestion at
                 # dataset creation
-                if rows[key]['dispatcher_script_path'] == "AutomaticallyCreatedInitialIngestionSubscription":
+                if InitialIngestion == True:
                     yield self.index_store.remove(rows[key]['data_src_id'] + rows[key]['user_ooi_id'])
                     log.info('NotificationAlertService.handle_update_event deleted InitialIngestionSubscription for ' + rows[key]['data_src_id'])
 
@@ -324,14 +348,14 @@ class NotificationAlertService(ServiceProcess):
         #   raise NotificationAlertError('Inconsistent data in create subscription information, ignoring',
         #                                    content.ResponseCodes.BAD_REQUEST)
         #Check that data source ids in both GPBs match
-        log.info('NotificationAlertService.handle_update_event subscriptionInfo.data_src_id %s', content.message_parameters_reference.subscriptionInfo.data_src_id )
-        log.info('NotificationAlertService.handle_update_event datasetMetadata.data_resource_id %s', content.message_parameters_reference.datasetMetadata.data_resource_id )
+        log.info('NotificationAlertService.op_addSubscription subscriptionInfo.data_src_id %s', content.message_parameters_reference.subscriptionInfo.data_src_id )
+        log.info('NotificationAlertService.op_addSubscription datasetMetadata.data_resource_id %s', content.message_parameters_reference.datasetMetadata.data_resource_id )
         if not (content.message_parameters_reference.subscriptionInfo.data_src_id == content.message_parameters_reference.datasetMetadata.data_resource_id ):
             raise NotificationAlertError('Inconsistent data in create subscription information, ignoring',
                                             content.ResponseCodes.BAD_REQUEST)
 
 
-        log.info("NotificationAlertService subscription_type' %s", content.message_parameters_reference.subscriptionInfo.subscription_type)
+        log.info("NotificationAlertService.op_addSubscription subscription_type' %s", content.message_parameters_reference.subscriptionInfo.subscription_type)
         #add the subscription to the index store
         log.info('NotificationAlertService.op_addSubscription add attributes\n ')
     
@@ -372,7 +396,7 @@ class NotificationAlertService(ServiceProcess):
         # create the AIS response GPBs
         log.info('NotificationAlertService.op_addSubscription construct response message')
         respMsg = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE)
-        respMsg.result = respMsg.ResponseCodes.OK;
+        respMsg.result = respMsg.ResponseCodes.OK
 
         log.info('NotificationAlertService.op_addSubscription complete')
         yield self.reply_ok(msg, respMsg)
@@ -406,6 +430,7 @@ class NotificationAlertService(ServiceProcess):
 
         log.info('NotificationAlertService.op_removeSubscription  Removing subscription %s from store...', content.message_parameters_reference.subscriptionInfo.data_src_id)
 
+        ### Hack - uses dataset id in the data_src_id field because that is what AIS/UI use. No need to change anything here - all the fields are consistently using dataset_id
         self.keyval = content.message_parameters_reference.subscriptionInfo.data_src_id + content.message_parameters_reference.subscriptionInfo.user_ooi_id
         log.info("NotificationAlertService.op_removeSubscription key: %s ", self.keyval)
 
@@ -450,6 +475,7 @@ class NotificationAlertService(ServiceProcess):
 
         log.info('NotificationAlertService.op_getSubscription  Returning subscription %s from store...', content.message_parameters_reference.subscriptionInfo.data_src_id)
 
+        ### Hack - uses dataset id in the data_src_id field because that is what AIS/UI use. No need to change anything here - all the fields are consistently using dataset_id
         self.keyval = content.message_parameters_reference.subscriptionInfo.data_src_id + content.message_parameters_reference.subscriptionInfo.user_ooi_id
         log.info("NotificationAlertService.op_getSubscription key: %s ", self.keyval)
 
@@ -458,6 +484,7 @@ class NotificationAlertService(ServiceProcess):
                                              content.ResponseCodes.BAD_REQUEST)
         query = Query()
         query.add_predicate_eq('user_ooi_id', content.message_parameters_reference.subscriptionInfo.user_ooi_id)
+        ### Hack - uses dataset id in the data_src_id field because that is what AIS/UI use. No need to change anything here - all the fields are consistently using dataset_id
         query.add_predicate_eq('data_src_id', content.message_parameters_reference.subscriptionInfo.data_src_id)
         rows = yield self.index_store.query(query)
         log.info("NotificationAlertService.op_getSubscription rows: %s ", str(rows))

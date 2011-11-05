@@ -25,11 +25,12 @@ from ion.services.coi.resource_registry.association_client import AssociationCli
 
 from ion.services.dm.inventory.association_service import AssociationServiceClient, AssociationServiceError, ASSOCIATION_GET_STAR_MSG_TYPE
 from ion.services.dm.inventory.association_service import PREDICATE_OBJECT_QUERY_TYPE, \
-    SUBJECT_PREDICATE_QUERY_TYPE, IDREF_TYPE
+    SUBJECT_PREDICATE_QUERY_TYPE, IDREF_TYPE, PREDICATE_REFERENCE_TYPE
 from ion.services.coi.datastore_bootstrap.ion_preload_config import TYPE_OF_ID, \
     DATASET_RESOURCE_TYPE_ID, DATASOURCE_RESOURCE_TYPE_ID, HAS_A_ID, OWNED_BY_ID
 
-PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
+from ion.integration.ais.common.ais_utils import AIS_Mixin
+
 
 #
 # Common Metadata Constants
@@ -76,10 +77,14 @@ UPDATE_INTERVAL_SECONDS = 'update_interval_seconds'
 VISUALIZATION_URL = 'visualization_url'
 VISIBILITY = 'visibility'
 
-class MetadataCache(object):
-    
-    __metadata = {}
 
+class MetadataCache(AIS_Mixin):
+    """
+    Metadata cache inherits from mixin because it used to contain most of these methods.
+
+    Most of the other AIS workers use an instance of the AIS worker process which is a proper mixin
+    """
+    
     def __init__(self, ais):
         log.info('MetadataCache.__init__()')
 
@@ -90,6 +95,9 @@ class MetadataCache(object):
 
         self.numDSets    = 0
         self.numDSources = 0
+
+        self.__metadata = {}
+
 
         #
         # A lock to ensure exclusive access to cache when updating
@@ -105,10 +113,18 @@ class MetadataCache(object):
 
     def getDatasets(self):
         dSetList = []                
-        for ds in self.__metadata.keys():
-            if (self.__metadata[ds][TYPE] is DSET):
-                dSetList.append(self.__metadata[ds])
+        for ds in self.__metadata.itervalues():
+            if (ds[TYPE] is DSET):
+                dSetList.append(ds)
         return dSetList                
+
+
+    def getDataSources(self):
+        dSourceList = []
+        for ds in self.__metadata.itervalues():
+            if (ds[TYPE] is DSOURCE):
+                dSourceList.append(ds)
+        return dSourceList
 
     @defer.inlineCallbacks
     def loadDataSets(self):
@@ -121,7 +137,7 @@ class MetadataCache(object):
         log.debug('loadDataSets()')
 
         # Get the list of dataset resource IDs
-        dSetResults = yield self.__findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
+        dSetResults = yield self.findResourcesOfType(DATASET_RESOURCE_TYPE_ID)
         if dSetResults == None:
             log.error('Error finding dataset resources.')
             defer.returnValue(False)
@@ -154,7 +170,7 @@ class MetadataCache(object):
         log.debug('loadDataSources()')
         
         # Get the list of datasource resource IDs
-        dSourceResults = yield self.__findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
+        dSourceResults = yield self.findResourcesOfType(DATASOURCE_RESOURCE_TYPE_ID)
         if dSourceResults == None:
             log.error('Error finding datasource resources.')
             defer.returnValue(False)
@@ -276,16 +292,16 @@ class MetadataCache(object):
                 #
                 # Set the persistent flag to False
                 #
-                dSetMetadata = self.__metadata[dSetID]
+                dSetMetadata = self.__metadata.pop(dSetID)
                 dSet = dSetMetadata[DSET]
                 dSet.Repository.persistent = False
     
-                self.__metadata.pop(dSetID)
+
             except KeyError:
                 log.error('deleteDSetMetadata: datasetID ' + dSetID + ' not cached')
                 returnValue = False
             else:
-                self.numDSets = self.numDSets - 1
+                self.numDSets -= 1
                 returnValue = True
     
             finally:
@@ -316,7 +332,7 @@ class MetadataCache(object):
                 log.debug('Metadata keys for ' + dSourceID + ': ' + str(metadata.keys()))
                 returnValue = metadata[DSOURCE]
             except KeyError:
-                log.error('Metadata not found for datasourceID: ' + dSourceID)
+                log.info('Metadata not found for datasourceID: ' + dSourceID)
                 returnValue = None
     
             finally:
@@ -386,7 +402,7 @@ class MetadataCache(object):
         
         if dSourceID is None:
             log.error('deleteDSourceMetadata: dSourceID is None')
-            returnValue is False
+            returnValue = False
         else:            
             log.debug('deleteDSourceMetadata for %s' %(dSourceID))
 
@@ -396,16 +412,16 @@ class MetadataCache(object):
                 #
                 # Set the persistent flag to False
                 #
-                dSourceMetadata = self.__metadata[dSourceID]
+                dSourceMetadata = self.__metadata.pop(dSourceID)
                 dSource = dSourceMetadata[DSOURCE]
                 dSource.Repository.persistent = False
     
-                self.__metadata.pop(dSourceID)
+
             except KeyError:
                 log.error('deleteDSourceMetadata: datasourceID ' + dSourceID + ' not cached')
                 returnValue = False
             else:
-                self.numDSources = self.numDSources - 1
+                self.numDSources -= 1
                 returnValue = True
     
             finally:
@@ -414,91 +430,6 @@ class MetadataCache(object):
         defer.returnValue(returnValue)
 
 
-    @defer.inlineCallbacks
-    def getAssociatedSource(self, dSetID):
-        """
-        Worker class private method to get the data source that associated
-        with a given data set.  
-        """
-
-        if dSetID is None:
-            log.error('getAssociatyedSource: dSetID is None')
-            defer.returnValue(None)
-        else:            
-            log.debug('getAssociatedSource for dSetID %s' %(dSetID))
-
-            try:
-                dSet = yield self.rc.get_instance(dSetID)
-                
-            except ResourceClientError:    
-                log.error('Error getting dataset instance for datasetID: %s!' %(dSetID))
-                defer.returnValue(None)
-                
-            try:
-                results = yield self.ac.find_associations(obj=dSet, predicate_or_predicates=HAS_A_ID)
-    
-            except AssociationClientError:
-                log.error('Error getting associated data source for Dataset: ' + \
-                          dSet.ResourceIdentity)
-                defer.returnValue(None)
-    
-            #
-            # If there is not exactly 1 associated data source, log an error and
-            # return None.  
-            #
-            if len(results) != 1:
-                log.error('Dataset %s has %d associated sources.' %(dSetID, len(results)))
-                defer.returnValue(None)
-            else:
-                for association in results:
-                    log.debug('Associated Source for Dataset: ' + \
-                              association.ObjectReference.key + \
-                              ' is: ' + association.SubjectReference.key)
-    
-            log.debug('getAssociatedSource() exit: returning: %s' %(association.SubjectReference.key))
-
-        defer.returnValue(association.SubjectReference.key)
-
-
-    @defer.inlineCallbacks
-    def getAssociatedDatasets(self, dSource):
-        """
-        Worker class private method to get the data sets that associated
-        with a given data source.  
-        """
-        log.debug('getAssociatedDatasets() entry')
-        
-        dSetList = []
-
-        if dSource is None:
-            log.error('getAssociatedDatasets: dSource parameter is None')
-            defer.returnValue(dSetList)
-
-        qmsg = yield self.mc.create_instance(ASSOCIATION_GET_STAR_MSG_TYPE)
-        pair = qmsg.subject_pairs.add()
-        pair.subject = qmsg.CreateObject(IDREF_TYPE)
-        pair.subject.key = dSource.ResourceIdentity
-        pair.predicate = qmsg.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pair.predicate.key = HAS_A_ID
-
-        pair = qmsg.object_pairs.add()
-        pair.object = qmsg.CreateObject(IDREF_TYPE)
-        pair.object.key = DATASET_RESOURCE_TYPE_ID
-        pair.predicate = qmsg.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pair.predicate.key = TYPE_OF_ID
-        try:
-            results = yield self.asc.get_star(qmsg)
-        except:
-            log.error('Error getting associated data sets for Datasource: ' + \
-                      dSource.ResourceIdentity)
-            defer.returnValue([])
-
-        dsets = [str(x.key) for x in results.idrefs]
-
-        log.info('Datasource %s has %d associated datasets.' %(dSource.ResourceIdentity, len(dsets)))
-        log.debug('getAssociatedDatasets) exit: returning: %s' %(str(dsets)))
-
-        defer.returnValue(dsets)
 
 
     @defer.inlineCallbacks
@@ -533,6 +464,10 @@ class MetadataCache(object):
 
         try:
             dSet = yield self.rc.get_instance(dSetID)
+
+            # Since the Resource is persistent, this must be done manually!
+            dSet.Repository.purge_previous_states()
+
             yield self.__loadDSetMetadata(dSet)
         except ResourceClientError:    
             log.error('get_instance failed for data set ID %s !' %(dSetID))
@@ -550,6 +485,10 @@ class MetadataCache(object):
 
         try:
             dSource = yield self.rc.get_instance(dSourceID)
+
+            # Since the Resource is persistent, this must be done manually!
+            dSource.Repository.purge_previous_states()
+
             self.__loadDSourceMetadata(dSource)
         except ResourceClientError:    
             log.error('get_instance failed for data source ID %s !' %(dSourceID))
@@ -570,7 +509,7 @@ class MetadataCache(object):
         #
         if (dSet.ResourceLifeCycleState == dSet.ACTIVE):
             dSetMetadata = {}
-            self.numDSets = self.numDSets + 1
+            self.numDSets += 1
             #
             # Store the entire dataset now; should be doing only that anyway.
             # Set persisence to true.  NOTE: remember to set this to false
@@ -581,7 +520,7 @@ class MetadataCache(object):
             dSetMetadata[DSET] = dSet
             dSetMetadata[DSOURCE_ID] = yield self.getAssociatedSource(dSet.ResourceIdentity)
             dSetMetadata[RESOURCE_ID] = dSet.ResourceIdentity
-            dSetMetadata[OWNER_ID] = yield self.__getAssociatedOwner(dSet.ResourceIdentity)
+            dSetMetadata[OWNER_ID] = yield self.getAssociatedOwner(dSet.ResourceIdentity)
             for attrib in dSet.root_group.attributes:
                 #log.debug('Root Attribute: %s = %s'  % (str(attrib.name), str(attrib.GetValue())))
                 if attrib.name == TITLE:
@@ -627,6 +566,7 @@ class MetadataCache(object):
         else:
             log.info('data set %s is not ACTIVE: Not caching.' %(dSet.ResourceIdentity))
 
+
     def __loadDSourceMetadata(self, dSource):
         """
         Create and load a dictionary entry with the metadata from the given
@@ -641,7 +581,7 @@ class MetadataCache(object):
         #
         if (dSource.ResourceLifeCycleState == dSource.ACTIVE):
             dSourceMetadata = {}
-            self.numDSources = self.numDSources + 1
+            self.numDSources += 1
             #
             # Store the entire datasource now; should be doing only that anyway
             # Set persisence to true.  NOTE: remember to set this to false
@@ -678,91 +618,6 @@ class MetadataCache(object):
             log.info('data source %s is not ACTIVE: Not caching.' %(dSource.ResourceIdentity))
 
 
-    @defer.inlineCallbacks
-    def __findResourcesOfType(self, resourceType):
-        """
-        A utility method to find all resources of the given type (resourceType).
-        """
-
-        request = yield self.mc.create_instance(PREDICATE_OBJECT_QUERY_TYPE)
-
-        #
-        # Set up a resource type search term using:
-        # - TYPE_OF_ID as predicate
-        # - object of type: resourceType parameter as object
-        #
-        pair = request.pairs.add()
-    
-        # ..(predicate)
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = TYPE_OF_ID
-
-        pair.predicate = pref
-
-        # ..(object)
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = resourceType
-        
-        pair.object = type_ref
-
-        try:
-            result = yield self.asc.get_subjects(request)
-
-        except AssociationServiceError:
-            log.error('__findResourcesOfType: association error!')
-            defer.returnValue(None)
-
-        defer.returnValue(result)
-
-
-    @defer.inlineCallbacks
-    def __getAssociatedOwner(self, dsID):
-        """
-        Worker class method to find the owner associated with a data set.
-        This is a public method because it can be called from the
-        findDataResourceDetail worker class.
-        """
-        log.debug('getAssociatedOwner() entry')
-
-        request = yield self.mc.create_instance(SUBJECT_PREDICATE_QUERY_TYPE)
-
-        #
-        # Set up an owned_by_id search term using:
-        # - OWNED_BY_ID as predicate
-        # - LCS_REFERENCE_TYPE object set to ACTIVE as object
-        #
-        pair = request.pairs.add()
-
-        # ..(predicate)
-        pref = request.CreateObject(PREDICATE_REFERENCE_TYPE)
-        pref.key = OWNED_BY_ID
-
-        pair.predicate = pref
-
-        # ..(subject)
-        type_ref = request.CreateObject(IDREF_TYPE)
-        type_ref.key = dsID
-        
-        pair.subject = type_ref
-
-        log.info('Calling get_objects with dsID: ' + dsID)
-
-        try:
-            result = yield self.asc.get_objects(request)
-        
-        except AssociationServiceError:
-            log.error('getAssociatedOwner: association error!')
-            defer.returnValue(None)
-
-        if len(result.idrefs) == 0:
-            log.error('Owner not found!')
-            defer.returnValue('OWNER NOT FOUND!')
-        elif len(result.idrefs) == 1:
-            log.debug('getAssociatedOwner() exit')
-            defer.returnValue(result.idrefs[0].key)
-        else:
-            log.error('More than 1 owner found!')
-            defer.returnValue('MULTIPLE OWNERS!')
 
 
     def __printMetadata(self, resType, res):

@@ -34,7 +34,12 @@ from ion.core.intercept.policy import get_current_roles, all_roles
 
 PREDICATE_REFERENCE_TYPE = object_utils.create_type_identifier(object_id=25, version=1)
 
-EPU_CONTROLLER_TYPE_ID = 'type_id_for_epu_controllers'
+EPU_CONTROLLER_TYPE_ID = 'dummy_type_id_for_epu_controllers'
+DATASET_KEY = 'datasets'
+DATASOURCE_KEY = 'datasources'
+IDENTITY_KEY = 'identities'
+EPUCONTROLLER_KEY = 'epucontrollers'
+
 
 class DictObj(object):
     def __getattr__(self, attr):
@@ -43,7 +48,7 @@ class DictObj(object):
 
 class ManageResources(object):
     
-   def __init__(self, ais):
+   def __init__(self, ais, metadataCache):
       log.debug('ManageResources.__init__()')
       DatasetValues = DATASET_RESOURCE_TYPE_ID, \
                       self.__LoadDatasetColumnData, \
@@ -65,29 +70,34 @@ class ManageResources(object):
                          self.__PrintEpucontrollerAttributes, \
                          self.__LoadEpucontrollerColumnHeadrers, \
                          self.__LoadEpucontrollerAttributes
-      self.ResourceTypes = {'datasets' : DatasetValues,
-                            'identities' : IdentityValues,
-                            'datasources' : DatasourceValues,
-                            'epucontrollers' : EpucontrollerValues
+      self.ResourceTypes = {DATASET_KEY : DatasetValues,
+                            IDENTITY_KEY : IdentityValues,
+                            DATASOURCE_KEY : DatasourceValues,
+                            EPUCONTROLLER_KEY : EpucontrollerValues
                            }
-      self.MapGpbTypeToResourceType = {10001 : 'datasets',
-                                       1401 : 'identities',
-                                       4503 : 'datasources'                                     
+      self.MapGpbTypeToResourceType = {10001 : DATASET_KEY,
+                                       1401 : IDENTITY_KEY,
+                                       4503 : DATASOURCE_KEY
                                        }
       self.SourceTypes = ['', 'SOS', 'USGS', 'AOML', 'NETCDF_S', 'NETCDF_C']
       self.RequestTypes = ['', 'NONE', 'XBT', 'CTD', 'DAP', 'FTP']
 
       self.mc = ais.mc
       self.asc = AssociationServiceClient(proc=ais)
-      self.rc = ResourceClient(proc=ais)
+      self.rc = ais.rc
       self.eclc = EPUControllerListClient(proc=ais)
+
+      self.metadataCache = metadataCache
+
+
+      self.ais = ais
 
 
    @defer.inlineCallbacks
    def getResourceTypes (self, msg):
       if log.getEffectiveLevel() <= logging.DEBUG:
          log.debug('ManageResources.getResourceTypes()\n'+str(msg))
-      
+
       # no input for this message, just build AIS response with list of resource types
       Response = yield self.mc.create_instance(AIS_RESPONSE_MSG_TYPE, MessageName='AIS getResourceTypes response')
       Response.message_parameters_reference.add()
@@ -167,10 +177,11 @@ class ManageResources(object):
    def __PrintEpucontrollerAttributes(self, ds):
       log.debug('de_state = '+str(ds['de_state']))
       log.debug('de_conf_report = '+str(ds['de_conf_report']))
-      log.debug('last_queuelen_size = '+str(ds['last_queuelen_size']))
-      log.debug('last_queuelen_time = '+str(ds['last_queuelen_time']))
       for instance in ds['instances']:
          log.debug('Instance Name = '+instance)
+         log.debug('Instance IAAS ID', ds['instances'][instance]['iaas_id'])
+         log.debug('Instance Public IP', ds['instances'][instance]['public_ip'])
+         log.debug('Instance Private IP', ds['instances'][instance]['private_ip'])
          log.debug('iaas_state = '+ds['instances'][instance]['iaas_state'])
          log.debug('iaas_state = '+str(ds['instances'][instance]['iaas_state_time']))
          log.debug('iaas_state = '+str(ds['instances'][instance]['heartbeat_time']))
@@ -317,28 +328,48 @@ class ManageResources(object):
       HeaderFunc(Response.message_parameters_reference[0])
 
       # load the attributes for each resource that was found into response
-      i = 0
-      while i < len(Result.idrefs):
-         # load the attributes of the resource into response
-         Response.message_parameters_reference[0].resources.add()
-         if ResourceType == EPU_CONTROLLER_TYPE_ID:
-            LoaderFunc(Response.message_parameters_reference[0].resources[i], Result.idrefs[i])
-         else:
-            # need to get the actual resource from it's ooi_id
-            ResID = Result.idrefs[i].key
-            log.debug('Working on ResID: ' + ResID)        
-            try:
-                Resource = yield self.rc.get_instance(ResID)
-            except ApplicationError, ex:
-                # build AIS error response
-                Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResource error response')
-                Response.error_num = Response.ResponseCodes.NOT_FOUND
-                Response.error_str = 'AIS.getResourcesOfType: Error calling get_instance: '+str(ex)
-                defer.returnValue(Response)
-            # debug print for dumping the attributes of the resource
-            PrintFunc(Resource)           
-            LoaderFunc(Response.message_parameters_reference[0].resources[i], Resource, ResID)
-         i = i + 1
+
+      if ResourceType == EPU_CONTROLLER_TYPE_ID:
+
+          for i, idref in enumerate(Result.idrefs):
+             # load the attributes of the resource into response
+             Response.message_parameters_reference[0].resources.add()
+
+             LoaderFunc(Response.message_parameters_reference[0].resources[i], idref)
+
+
+      else:
+
+          for i, idref in enumerate(Result.idrefs):
+              # need to get the actual resource from it's ooi_id
+              ResID = idref.key
+              log.debug('Working on ResID: ' + ResID)
+
+              Resource = None
+
+              # If it is a data set or a data source - try to get it from the metadata cache
+              if ResourceType == DATASET_RESOURCE_TYPE_ID:
+                  Resource = yield self.metadataCache.getDSet(ResID)
+              elif ResourceType == DATASOURCE_RESOURCE_TYPE_ID:
+                  Resource = yield self.metadataCache.getDSource(ResID)
+
+              # If it is an identity or not found in the metadata cache - get it from the datastore!
+              if Resource is None:
+                  try:
+                      Resource = yield self.rc.get_instance(ResID)
+                  except ApplicationError, ex:
+                      # build AIS error response
+                      Response = yield self.mc.create_instance(AIS_RESPONSE_ERROR_TYPE, MessageName='AIS getResource error response')
+                      Response.error_num = Response.ResponseCodes.NOT_FOUND
+                      Response.error_str = 'AIS.getResourcesOfType: Error calling get_instance: '+str(ex)
+                      defer.returnValue(Response)
+
+              # debug print for dumping the attributes of the resource
+              Response.message_parameters_reference[0].resources.add()
+
+              PrintFunc(Resource)
+              LoaderFunc(Response.message_parameters_reference[0].resources[i], Resource, ResID)
+
 
       if log.getEffectiveLevel() <= logging.DEBUG:
          log.debug('ManageResources.getResourcesOfType(): returning\n'+str(Response))        
@@ -375,6 +406,8 @@ class ManageResources(object):
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
+         
+      defer.returnValue(ns.Index)
 
 
    @defer.inlineCallbacks
@@ -412,6 +445,9 @@ class ManageResources(object):
          estr = 'Object ERROR!'
          log.exception(estr)
          
+      defer.returnValue(ns.Index)
+      
+         
          
    @defer.inlineCallbacks
    def __LoadDatasourceAttributes(self, To, From):
@@ -430,8 +466,12 @@ class ManageResources(object):
 
       try:
          AddItem('source_type', self.SourceTypes[From.source_type])
-         AddItem('property', From.property[0])
-         AddItem('station_id', From.station_id[0])
+
+         if len(From.property) > 0:
+             AddItem('property', From.property[0])
+
+         if len(From.station_id) >0:
+             AddItem('station_id', From.station_id[0])
          AddItem('request_type', self.RequestTypes[From.request_type])
          AddItem('request_bounds_north', str(From.request_bounds_north))
          AddItem('request_bounds_south', str(From.request_bounds_south))
@@ -459,6 +499,8 @@ class ManageResources(object):
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
+         
+      defer.returnValue(ns.Index)
 
 
    def __LoadEpucontrollerAttributes(self, To, From):
@@ -468,7 +510,10 @@ class ManageResources(object):
       def AddItem(Name, Value):  # worker function to hide ugly GPB methodology
          To.resource.add()
          To.resource[ns.Index].name = Name
-         To.resource[ns.Index].value = Value
+         if Value == None:
+            To.resource[ns.Index].value = 'None'
+         else:
+            To.resource[ns.Index].value = Value
          ns.Index = ns.Index + 1
          
       ns = namespace()   # create wrapper class for scoping so worker function can set variable
@@ -477,18 +522,27 @@ class ManageResources(object):
       try:
          AddItem('Decision Engine State', From['de_state'])
          AddItem('Decision Engine Configuration Report', From['de_conf_report'])
-         AddItem('Last Queue Length Size', str(From['last_queuelen_size']))
-         AddItem('Last Queue Length Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['last_queuelen_time'])))
          for instance in From['instances']:
             AddItem('Instance Name', instance)
+            AddItem('Instance IAAS ID', From['instances'][instance]['iaas_id'])
+            AddItem('Instance Public IP', From['instances'][instance]['public_ip'])
+            AddItem('Instance Private IP', From['instances'][instance]['private_ip'])
             AddItem('Instance State', From['instances'][instance]['iaas_state'])
-            AddItem('Instance State Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['iaas_state_time'])))
-            AddItem('Heartbeat Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['heartbeat_time'])))
+            if From['instances'][instance]['iaas_state_time'] == None:
+               AddItem('Instance State Time', 'None')
+            else:
+               AddItem('Instance State Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['iaas_state_time'])))
+            if From['instances'][instance]['heartbeat_time'] == None:
+               AddItem('Heartbeat Time', 'None')
+            else:
+               AddItem('Heartbeat Time', time.strftime("%a %b %d %Y %H:%M:%S", time.localtime(From['instances'][instance]['heartbeat_time'])))
             AddItem('Heartbeat State', From['instances'][instance]['heartbeat_state'])
     
       except:
          estr = 'Object ERROR!'
          log.exception(estr)
+         
+      return ns.Index
 
 
    @defer.inlineCallbacks
@@ -529,7 +583,7 @@ class ManageResources(object):
          # debug print for dumping the attributes of the resource
          if log.getEffectiveLevel() <= logging.DEBUG:
             log.debug("got back resource \n"+str(Result))
-         ResourceType = 'epucontrollers'
+         ResourceType = EPUCONTROLLER_KEY
       else:
          # get resource from resource registry
          log.debug("attempting to get resource with id = "+msg.message_parameters_reference.ooi_id)
@@ -556,7 +610,21 @@ class ManageResources(object):
       Response.message_parameters_reference.add()
       Response.message_parameters_reference[0] = Response.CreateObject(GET_RESOURCE_RESPONSE_TYPE)
       LoaderFunc = self.ResourceTypes[ResourceType][4]
-      yield LoaderFunc(Response.message_parameters_reference[0], Result)
+      Index = yield LoaderFunc(Response.message_parameters_reference[0], Result)
+      if (ResourceType == DATASET_KEY):
+         ResourceID = yield self.ais.getAssociatedSource(Result.ResourceIdentity)
+         Response.message_parameters_reference[0].resource.add()
+         Response.message_parameters_reference[0].resource[Index].name = "Data Source ID"
+         Response.message_parameters_reference[0].resource[Index].value = ResourceID
+      elif (ResourceType == DATASOURCE_KEY):
+         ResourceIDs = yield self.ais.getAssociatedDatasets(Result)
+         if len(ResourceIDs) == 0:
+            ResourceID = 'None'
+         else:
+            ResourceID = ResourceIDs[0]
+         Response.message_parameters_reference[0].resource.add()
+         Response.message_parameters_reference[0].resource[Index].name = "Data Set ID"
+         Response.message_parameters_reference[0].resource[Index].value = ResourceID
       Response.result = Response.ResponseCodes.OK
       if log.getEffectiveLevel() <= logging.DEBUG:
          log.debug('ManageResources.getResource(): returning\n'+str(Response))

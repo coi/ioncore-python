@@ -125,9 +125,14 @@ class LRUDict(object):
     def purge(self):
         while self.total_size > self.limit:
             if self.first == self.last:
+                obj = self.first.me[1]
+                if hasattr(obj, 'clear'):
+                    obj.clear()
+
                 self.first = None
                 self.last = None
                 self.total_size = 0
+                self.d.clear()
                 return
 
             a = self.first
@@ -220,6 +225,8 @@ class LRUDict(object):
         self.first = None
         self.last = None
 
+# Remove for code coverage
+'''
 if __name__ == '__main__':
     def main():
         class ObjectWithSize(object):
@@ -259,3 +266,4 @@ if __name__ == '__main__':
         print 'Should be false: ', lru.has_key('monkey')
 
     main()
+'''

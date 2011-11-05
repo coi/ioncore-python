@@ -7,12 +7,15 @@
 @author Matt Rodriguez
 """
 from twisted.trial import unittest
-from ion.core.exception import ReceivedContainerError
+from ion.core.exception import ReceivedContainerError, ReceivedApplicationError
 from ion.core.messaging.receiver import Receiver, WorkerReceiver
 from ion.core.process.process import Process
 from ion.core.object.object_utils import ARRAY_STRUCTURE_TYPE, CDM_ARRAY_FLOAT64_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ARRAY_FLOAT32_TYPE, CDM_ATTRIBUTE_TYPE
 
+from ion.core.object.test.test_workbench import WorkBenchProcess
+
 import ion.util.ionlog
+
 log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
@@ -35,11 +38,11 @@ from telephus.cassandra.ttypes import InvalidRequestException
 
 from ion.services.coi.datastore import ION_DATASETS_CFG, PRELOAD_CFG, ID_CFG, DataStoreClient, CDM_BOUNDED_ARRAY_TYPE
 # Pick three to test existence
-from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID, NAME_CFG, CONTENT_ARGS_CFG, PREDICATE_CFG, ION_RESOURCE_TYPES_CFG, ION_PREDICATES_CFG, ION_IDENTITIES_CFG
+from ion.services.coi.datastore_bootstrap.ion_preload_config import HAS_A_ID, DATASET_RESOURCE_TYPE_ID, ROOT_USER_ID, NAME_CFG, CONTENT_ARGS_CFG, PREDICATE_CFG, ION_RESOURCE_TYPES_CFG, ION_PREDICATES_CFG, ION_IDENTITIES_CFG, SAMPLE_PROFILE_DATA_SOURCE_ID
 
 from ion.services.coi.datastore_bootstrap.ion_preload_config import ION_DATASETS, ION_PREDICATES, ION_RESOURCE_TYPES, ION_IDENTITIES, ION_AIS_RESOURCES_CFG, ION_AIS_RESOURCES, SAMPLE_PROFILE_DATASET_ID, HAS_A_ID
 
-from ion.core.object.workbench import REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, IDREF_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GPBTYPE_TYPE, DATA_REQUEST_MESSAGE_TYPE
+from ion.core.object.workbench import REQUEST_COMMIT_BLOBS_MESSAGE_TYPE, BLOBS_MESSAGE_TYPE, IDREF_TYPE, GET_OBJECT_REQUEST_MESSAGE_TYPE, GPBTYPE_TYPE, DATA_REQUEST_MESSAGE_TYPE, GET_LCS_REQUEST_MESSAGE_TYPE
 from ion.core.object.gpb_wrapper import StructureElement
 
 person_type = object_utils.create_type_identifier(object_id=20001, version=1)
@@ -70,6 +73,14 @@ def create_large_object(wb):
 
     defer.returnValue(repo)
 
+
+def create_many_commits(repo, number):
+
+    for n in range(number):
+        repo.root_object.title = 'WB Title Commit: %s' % str(n)
+        repo.commit('repo %s commit' % str(n))
+
+    return
 
 
 
@@ -669,7 +680,51 @@ class DataStoreTest(IonTestCase):
 
             self.assertEqual(default_obj.word, value[PREDICATE_CFG])
 
-    """
+    @defer.inlineCallbacks
+    def test_get_lcs(self):
+        p = Process(proc_name='test_anon')
+        yield p.spawn()
+
+        #msg = yield p.message_client.create_instance(GET_OBJECT_REQUEST_MESSAGE_TYPE)
+
+        #idref = msg.CreateObject(IDREF_TYPE)
+        #idref.key = SAMPLE_PROFILE_DATASET_ID
+        #msg.object_id = idref
+
+        dsc = DataStoreClient(proc=p)
+        request = yield p.message_client.create_instance(GET_LCS_REQUEST_MESSAGE_TYPE)
+        request.keys.append(SAMPLE_PROFILE_DATASET_ID)
+
+        obj = yield dsc.get_lcs(request)
+
+        self.failUnlessEquals(len(obj.key_lcs_pairs), 1)
+        self.failUnlessEqual(obj.key_lcs_pairs[0].lcs, obj.key_lcs_pairs[0].LifeCycleState.ACTIVE)
+
+        # now get multiple
+        request = yield p.message_client.create_instance(GET_LCS_REQUEST_MESSAGE_TYPE)
+        request.keys.append(SAMPLE_PROFILE_DATASET_ID)
+        request.keys.append(SAMPLE_PROFILE_DATA_SOURCE_ID)
+
+        obj2 = yield dsc.get_lcs(request)
+
+        self.failUnlessEquals(len(obj2.key_lcs_pairs), 2)
+        self.failUnlessEquals([x.lcs for x in obj2.key_lcs_pairs], [obj.key_lcs_pairs[0].LifeCycleState.ACTIVE] * len(obj2.key_lcs_pairs))
+
+    @defer.inlineCallbacks
+    def test_get_lcs_invalid_key(self):
+        p = Process(proc_name='test_anon')
+        yield p.spawn()
+
+
+        request = yield p.message_client.create_instance(GET_LCS_REQUEST_MESSAGE_TYPE)
+        request.keys.append("this key does not exist")
+
+        dsc = DataStoreClient(proc=p)
+        lcsdef = dsc.get_lcs(request)
+
+        yield self.failUnlessFailure(lcsdef, ReceivedApplicationError)
+
+
 
 
     @defer.inlineCallbacks
@@ -689,7 +744,7 @@ class DataStoreTest(IonTestCase):
 
             self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
-            self.wb1.workbench.manage_workbench_cache('Test runner context!')
+            self.wb1.workbench.manage_workbench_cache('Default Context')
 
             log.info(pu.print_memory_usage())
             log.info("WB1: %s" % self.wb1.workbench_memory())
@@ -736,6 +791,8 @@ class DataStoreTest(IonTestCase):
 
             self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
 
+            self.wb1.workbench.manage_workbench_cache('Default Context')
+
             log.info("WB1: %s" % self.wb1.workbench_memory())
             log.info("DS1: %s" % self.ds1.workbench_memory())
             log.info("Expect memory to grow unless you are using cassandra backend and the cache is full")
@@ -743,7 +800,6 @@ class DataStoreTest(IonTestCase):
             mem = yield pu.print_memory_usage()
             log.info(mem)
 
-            self.wb1.workbench.manage_workbench_cache('Test runner context!')
 
 
 
@@ -754,7 +810,7 @@ class DataStoreTest(IonTestCase):
 
         for i in range(self.repetitions):
             yield self.test_checkout_defaults()
-            self.wb1.workbench.manage_workbench_cache('Test runner context!')
+            self.wb1.workbench.manage_workbench_cache('Default Context')
 
             for key, repo in self.wb1.workbench._repo_cache.iteritems():
                 log.info('Repo Name - %s, size - %d, # of blobs - %d' % (key, repo.__sizeof__(), len(repo.index_hash)))
@@ -765,7 +821,64 @@ class DataStoreTest(IonTestCase):
             mem = yield pu.print_memory_usage()
             log.info(mem)
 
-    """
+
+
+    @defer.inlineCallbacks
+    def test_truncate_commits(self):
+
+        log.info('Create 30 commits and push to datastore')
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+        create_many_commits(repo,30)
+        result = yield self.wb1.workbench.push('datastore',repo)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+
+        log.info('Create 30 more commits and push to datastore')
+        create_many_commits(repo,30)
+        result = yield self.wb1.workbench.push('datastore',repo)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+
+        log.info('Create a new workbench process and pull from datastore')
+        wb2 = WorkBenchProcess()
+        yield wb2.spawn()
+
+        result = yield wb2.workbench.pull('datastore', self.repo_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        repo2 = wb2.workbench.get_repository(self.repo_key)
+        yield repo2.checkout('master')
+
+        log.info('Create 61 commits and push to datastore from workbench 2')
+        create_many_commits(repo2,61)
+        # Test pushing more than the default number to truncate...
+        result = yield wb2.workbench.push('datastore',repo2)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+
+        self.assertEqual(len(repo2._commit_index),111)
+
+
+
+        log.info('Pull it back to wb2 again - to clear the number of commits')
+        result = yield wb2.workbench.pull('datastore', self.repo_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        repo2 = wb2.workbench.get_repository(self.repo_key)
+        yield repo2.checkout('master')
+
+
+
+        log.info('Pull it all back to workbench 1...')
+        # Now pull it back to the original...
+        result = yield self.wb1.workbench.pull('datastore', self.repo_key)
+        self.assertEqual(result.MessageResponseCode, result.ResponseCodes.OK)
+
+        repo = self.wb1.workbench.get_repository(self.repo_key)
+        yield repo.checkout('master')
+
+
+
 
 class MulitDataStoreTest(IonTestCase):
     """

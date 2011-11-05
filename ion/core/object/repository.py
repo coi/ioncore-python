@@ -243,8 +243,9 @@ class ObjectContainer(object):
         """
         output  = '============== %s  ==============\n' % self.__class__.__name__
 
-        output += 'Number of current workspace objects: %d \n' % len(self._workspace)
-        output += 'Number of current index hash objects: %d \n' % len(self.index_hash)
+        output += 'Number of workspace objects: %d \n' % len(self._workspace)
+        output += 'Number of index hash objects: %d \n' % len(self.index_hash)
+        output += 'Number of commit objects: %d \n' % len(self._commit_index)
         output += 'Excluded types:\n'
 
         try:
@@ -585,6 +586,8 @@ class Repository(ObjectContainer):
         to level 2 LRU caching in the workbench.
         """
 
+        # Only used by the datastore to track blobs worth holding onto...
+        self.keys_to_keep = set()
 
 
         ### Structures for managing associations to a repository:
@@ -614,8 +617,9 @@ class Repository(ObjectContainer):
 
         output  = '============== Repository (status: %s) ==============\n' % self.status
 
-        output += 'Number of current workspace objects: %d \n' % len(self._workspace)
-        output += 'Number of current index hash objects: %d \n' % len(self.index_hash)
+        output += 'Number of workspace objects: %d \n' % len(self._workspace)
+        output += 'Number of index hash objects: %d \n' % len(self.index_hash)
+        output += 'Number of commit objects: %d \n' % len(self._commit_index)
         output += 'Current context identifier for repository: %s \n' % self.convid_context
         output += 'Cached (%s) and Persistent (%s) settings \n' % (str(self.cached), str(self.persistent))
         if self._current_branch is not None:
@@ -666,6 +670,9 @@ class Repository(ObjectContainer):
         #print self._dotgit
         #print other._dotgit
 
+        if self._dotgit is None:
+            return False
+
         if self._dotgit == other._dotgit:
 
             return True
@@ -681,6 +688,8 @@ class Repository(ObjectContainer):
 
     @property
     def repository_key(self):
+        if self._dotgit is None:
+            raise RepositoryError('DotGit object in repository is None - this repo has been cleared!')
         return self._dotgit.repositorykey
 
     def _set_persistent(self, value):
@@ -753,6 +762,7 @@ class Repository(ObjectContainer):
 
 
         self._dotgit.Invalidate()
+        self._dotgit = None
 
         self._workspace.clear()
         self.index_hash.clear()
@@ -764,7 +774,7 @@ class Repository(ObjectContainer):
         self._process = None
 
         if self.merge is not None:
-            for mr in self.merge:
+            for mr in self.merge.merge_repos:
                 mr.clear()
 
 
@@ -792,6 +802,8 @@ class Repository(ObjectContainer):
         """
         Convience method to access the branches from the mutable head (dotgit object)
         """
+        if self._dotgit is None:
+            raise RepositoryError('DotGit object in repository is None - this repo has been cleared!')
         return self._dotgit.branches
 
 
@@ -1126,9 +1138,9 @@ class Repository(ObjectContainer):
 
 
         if keys_are_the_same:
-            log.warn('BRANCH STATE HAS DIVERGED BUT CONTENT IS THE SAME - MERGING WITH NO INFORMATION LOST')
+            log.warn('BRANCH STATE HAS DIVERGED BUT CONTENT IS THE SAME - MERGING WITH NO INFORMATION LOST, REPO KEY %s' % self.repository_key)
         else:
-            log.warn('BRANCH STATE HAS DIVERGED - MERGING BY DATE WITH INFORMATION LOST')
+            log.warn('BRANCH STATE HAS DIVERGED - MERGING BY DATE WITH INFORMATION LOST, REPO KEY %s' % self.repository_key)
 
 
         # Deal with the newest ref seperately
@@ -1202,6 +1214,74 @@ class Repository(ObjectContainer):
 
         return ancestor
 
+    def truncate_commits(self, ncom=50):
+
+        log.info('Truncating Commits in repository -  %s' % self.repository_key)
+
+        # the set of all commits - from which we will remove the newest 50
+        old_commit_keys = set(self._commit_index.keys())
+
+        # bail early if there are less than 50 commits
+        if len(old_commit_keys) <= ncom:
+            return
+
+        # the front wave of commits - starting with head
+        commits_front = self.current_heads()
+
+        if len(commits_front) > 10:
+            raise RepositoryError('Unexpectedly high number of branches - something is wrong with this repo! \n%s' % str(self))
+
+        # Set the head
+        keep_commit_keys = set([cref.MyId for cref in commits_front])
+
+        # and remove them from the old list
+        for key in keep_commit_keys:
+            old_commit_keys.remove(key)
+
+        # Now iterate their parents keeping the newest generations...
+        new_front = set()
+        while len(keep_commit_keys) < ncom:
+
+            for cref in commits_front:
+
+                for pref in cref.parentrefs:
+
+                    parent = pref.commitref
+
+                    if parent.MyId not in keep_commit_keys:
+
+                        keep_commit_keys.add(parent.MyId)
+
+                        new_front.add(parent)
+
+                        old_commit_keys.remove(parent.MyId)
+
+            commits_front = new_front
+            new_front = set()
+
+        # Remove the old keys - truncating the local history
+        for key in old_commit_keys:
+
+            cref = self._commit_index[key]
+            cref.Invalidate()
+            del self._commit_index[key]
+            del self.index_hash[key]
+
+        # Clean up any parent refs left behind Bug OOIION-510
+        for cref in self._commit_index.itervalues():
+
+            for plink in cref.ParentLinks.copy():
+
+                if plink.Invalid:
+                    cref.ParentLinks.discard(plink)
+
+        log.info('Truncate Commits - Complete!')
+
+
+        return
+
+
+
     def reset(self):
         
         if self.status != self.MODIFIED:
@@ -1239,6 +1319,33 @@ class Repository(ObjectContainer):
 
         self._workspace.clear()
         self._workspace_root = None
+
+
+    def purge_previous_states(self):
+
+
+        if self.status == self.MODIFIED:
+
+            #@TODO consider changing this to a warning rather than an exception
+            log.warn('Can not call purge previous states on a repository in a modified state!')
+            return
+
+        data_blobs = set(self.index_hash.keys()).difference(set(self._commit_index.keys()))
+
+        old_data_blobs = data_blobs.difference(set(self._workspace.keys()))
+
+        throw_away_blobs = old_data_blobs.difference(self.keys_to_keep)
+
+        # Clear the set of keys to keep
+        self.keys_to_keep = set()
+
+        for key in throw_away_blobs:
+            del self.index_hash[key]
+
+
+        return
+
+
 
 
     def purge_associations(self):
