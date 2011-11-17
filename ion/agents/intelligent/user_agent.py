@@ -6,8 +6,11 @@
 @brief An example service definition that can be used as template.
 """
 
+print str(__name__)
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
+
+
 from twisted.internet import defer
 
 from ion.core.process.process import ProcessFactory
@@ -32,7 +35,10 @@ class UserAgentService(ServiceProcess):
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
         pass
-
+    
+    def hi(self, name):
+        print "hi " + name
+        
     @defer.inlineCallbacks
     def op_service_request(self, request_content, headers, msg):
         log.info('op_service_request content: '+str(request_content))
@@ -66,6 +72,8 @@ class UserAgentServiceClient(ServiceClient):
     def service_request_deferred(self, request=None):
         return self.rpc_send('service_request', request)
 
+    def hi(self, name):
+        print "hi " + name
 # Spawn of the process using the module name
 factory = ProcessFactory(UserAgentService)
 

@@ -1,0 +1,25 @@
+# governance.rel:
+# contains all the processes that need to be invoked to demo governance use case
+# Author: Prashant Kediyal
+{
+    "type":"release",
+    "name":"Governance",
+    "version": "0.1",
+    "description": "Governance example",
+    "ioncore" : "0.1",
+    "apps":[
+        {'name':'ccagent', 'version':'0.1', 'config':{'hello':'one'}},
+        {'name':'user_agent',    'version':'0.1',
+                                  'processapp':('user_agent','ion.agents.intelligent.user_agent','UserAgentService'),
+                },
+        {'name':'resource_agent',    'version':'0.1',
+                                      'processapp':('resource_agent','ion.agents.intelligent.resource_agent','ResourceAgentService'),
+                        },
+        {'name':'user_one',    'version':'0.1',
+                                      'processapp':('user_one','ion.agents.intelligent.test.user_one','UserOne'),
+                        },
+        {'name':'user_two',    'version':'0.1',
+                                      'processapp':('user_two','ion.agents.intelligent.test.user_two','UserTwo'),
+                        },
+    ]
+}
