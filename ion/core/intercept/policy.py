@@ -302,7 +302,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
             else:
                 log.info('Policy Interceptor: operation not in policy dictionary.')
         else:
-            if service == 'hello_resource' and operation=='create_instrument_resource':
+            if service == 'resourceagent' and operation=='execute_request':
                 #TODO get all the roles for a user
                 #user_roles=[]
                 #for role in role_user_dict:
@@ -334,25 +334,29 @@ class PolicyInterceptor(EnvelopeInterceptor):
     @defer.inlineCallbacks
     def check_policies(self,msg,invocation,decision):
         requestCtx = request._createRequestCtx(msg)
-        log.debug('request context created')
-        pdp = request._createPDP()
-        log.debug('pdp created')
-        response = pdp.evaluate(requestCtx)
-        log.debug('pdp evaluated response')
-        if response is None:
-            log.debug('response from PDP contains nothing')
+        if requestCtx is None:
+            log.debug('requestCtx is empty')
             invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
         else:
-            for result in response.results:
-                if str(result.decision) == Decision.DENY_STR:
-                    break
-            if str(result.decision) == Decision.DENY_STR:
-                decision['permit']=False
+            log.debug('request context created')
+            pdp = request._createPDP()
+            log.debug('pdp created')
+            response = pdp.evaluate(requestCtx)
+            log.debug('pdp evaluated response')
+            if response is None:
+                log.debug('response from PDP contains nothing')
                 invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
             else:
-                decision['permit']=True
-        log.info('XACML Policy Interceptor permission: '+str(decision['permit']))
-        defer.returnValue(invocation)
+                for result in response.results:
+                    if str(result.decision) == Decision.DENY_STR:
+                        break
+                if str(result.decision) == Decision.DENY_STR:
+                    decision['permit']=False
+                    invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
+                else:
+                    decision['permit']=True
+            log.info('XACML Policy Interceptor permission: '+str(decision['permit']))
+            defer.returnValue(invocation)
         yield (1,)
 
     @defer.inlineCallbacks

@@ -7,6 +7,7 @@
     xmlns:md="http:www.med.example.com/schemas/record.xsd"
     PolicyId="urn:oasis:names:tc:xacml:2.0:example:policyid:1"
     RuleCombiningAlgId="urn:oasis:names:tc:xacml:1.0:rule-combining-algorithm:deny-overrides">
+    <!--ooi,researcher,glider55,get_temp -->
 
     <PolicyDefaults>
         <XPathVersion>http://www.w3.org/TR/1999/Rec-xpath-19991116</XPathVersion>
@@ -16,8 +17,8 @@
         <Resources>
             <Resource>
                 <ResourceMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
-                     <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">hello_resource</AttributeValue>
-                     <ResourceAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:resource:service-provider" DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                     <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">glider55</AttributeValue>
+                     <ResourceAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:resource:resource-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
                 </ResourceMatch>
             </Resource>
         </Resources>
@@ -41,7 +42,7 @@
         </Apply>
     </VariableDefinition>
    -->
-    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:1" Effect="Permit">
+    <Rule RuleId="urn:oasis:names:tc:xacml:2.0:example:ruleid:1" Effect="Deny">
         <Description>
             request for operation create_instrument_resource on service hello resource
             should not be allowed to anonymous users
@@ -50,21 +51,53 @@
             <Actions>
                 <Action>
                     <ActionMatch MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
-                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">create_instrument_resource</AttributeValue>
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">get_temp</AttributeValue>
                         <ActionAttributeDesignator AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id" DataType="http://www.w3.org/2001/XMLSchema#string"/>
                     </ActionMatch>
                 </Action>
             </Actions>
         </Target>
+        <!--Condition>
+            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:and">
+                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-at-least-one-member-of">
+                    <SubjectAttributeDesignator
+                         AttributeId="urn:oasis:names:tc:xacml:1.0:ooici:subject-id-role"
+                         DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-bag">
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">researcher</AttributeValue>
+                        <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">student</AttributeValue>
+                    </Apply>
+                </Apply>
+                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+                    <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
+                        <SubjectAttributeDesignator
+                         AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id-qualifier"
+                         DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                    </Apply>
+                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">ooi</AttributeValue>
+                </Apply>
+            </Apply>
+        </Condition-->
         <Condition>
+            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-at-least-one-member-of">
+                                <SubjectAttributeDesignator
+                                     AttributeId="urn:oasis:names:tc:xacml:1.0:ooici:subject-id-role"
+                                     DataType="http://www.w3.org/2001/XMLSchema#string"/>
+                                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-bag">
+                                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">researcher</AttributeValue>
+                                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">student</AttributeValue>
+                                </Apply>
+            </Apply>
+        </Condition>
+        <!--Condition>
             <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
                     <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
                         <SubjectAttributeDesignator
-                         AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id"
+                         AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id-qualifier"
                          DataType="http://www.w3.org/2001/XMLSchema#string"/>
                     </Apply>
-                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">ANONYMOUS</AttributeValue>
+                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">ooi</AttributeValue>
             </Apply>
-        </Condition>
+        </Condition-->
     </Rule>
 </Policy>

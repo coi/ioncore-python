@@ -32,7 +32,8 @@ THIS_DIR = path.dirname(__file__)
 XACML_ION_POLICY_FILENAME='ion_agent_policies.xml'
 XACML_POLICY_FILEPATH=path.join(THIS_DIR, XACML_ION_POLICY_FILENAME)
 
-SERVICE_PROVIDER_ATTRIBUTE="urn:oasis:names:tc:xacml:1.0:resource:service-provider"
+SERVICE_PROVIDER_ATTRIBUTE_ID="urn:oasis:names:tc:xacml:1.0:ooici:resource:service-provider"
+ROLE_ATTRIBUTE_ID='urn:oasis:names:tc:xacml:1.0:ooici:subject-id-role'
 #"""XACML DATATYPES"""
 attributeValueFactory = AttributeValueClassFactory()
 AnyUriAttributeValue = attributeValueFactory(AttributeValue.ANY_TYPE_URI)
@@ -46,24 +47,33 @@ def _createPDP():
         return pdp
 
 def _createRequestCtx(msg):
+    print 'role ' + str(msg['content']['role'])
+    if msg['content']['role'] is None:
+        log.warn('empty request created')
+        print 'no role'
+        return
+
     subject_id=msg['user-id']
-    agent=msg['receiver'].split(".")[1]
-    #org=msg['content']['org']
-    #subject_id_qualifier=agent+':'+org
-    subject_id_qualifier=agent
-    #resource_id = msg['content']['resource_id']
-    resource_ids=msg['receiver'].rsplit('.',1)[-1]
-    resource_service_id=msg['receiver'].rsplit('.',1)[-1]
-    action_id=msg['op']
+    org=msg['content']['org']
+    subjectRoles=msg['content']['role']
+    resource_id=msg['content']['resource_id']
+    action_id=msg['content']['op']
 
+    print subject_id + " - " + org + " - "+ str(subjectRoles)+" - "+resource_id+" - "+action_id
+    #agent_id=msg['receiver'].split(".")[1]
+    #subject_id_qualifier=agent
+    #agent_type = msg['receiver'].rsplit('.',1)[-1]
 
+    
     #    """Create empty request"""
     request = Request()
-    log.debug('empty request created')
+
+    #
     # create subject and populate it with appropriate data
+    #
     subject = Subject()
     log.debug('empty subject created')
-    # create subject id attribute and populate it with appropriate data
+        # create subject id attribute and populate it with appropriate data
     subjectIdAttribute = Attribute()
     log.debug('empty subject attribute created')
     subjectIdAttribute.attributeId = Identifiers.Subject.SUBJECT_ID
@@ -71,58 +81,57 @@ def _createRequestCtx(msg):
     subjectIdAttribute.attributeValues.append(StringAttributeValue())
     subjectIdAttribute.attributeValues[-1].value = subject_id
     log.debug('added data and type to subject attribute')
-
-    # create subject qualifier attribute and populate it with appropriate data
+        # create subject qualifier attribute and populate it with appropriate data
     subjectQualifierAttribute = Attribute()
     log.debug('empty attribute created')
     subjectQualifierAttribute.attributeId = Identifiers.Subject.SUBJECT_ID_QUALIFIER
     subjectQualifierAttribute.dataType = StringAttributeValue.IDENTIFIER
     subjectQualifierAttribute.attributeValues.append(StringAttributeValue())
-    subjectQualifierAttribute.attributeValues[-1].value = subject_id_qualifier
+    subjectQualifierAttribute.attributeValues[-1].value = org
     log.debug('added data and type to subject qualifier attribute')
 
 # create role attribute for the subject's, possibly, multiple roles
-#    for role in subjectRoles:
-#        roleAttribute = Attribute()
-#        roleAttribute.attributeId = roleAttributeId
-#        roleAttribute.dataType = StringAttributeValue.IDENTIFIER
-#        roleAttribute.attributeValues.append(StringAttributeValue())
-#        roleAttribute.attributeValues[-1].value = role
-#        subject.attributes.append(roleAttribute)
+    for role in subjectRoles:
+        roleAttribute = Attribute()
+        roleAttribute.attributeId = ROLE_ATTRIBUTE_ID
+        roleAttribute.dataType = StringAttributeValue.IDENTIFIER
+        roleAttribute.attributeValues.append(StringAttributeValue())
+        roleAttribute.attributeValues[-1].value = role
+        
 
-
-    # add attributes to the subject element
+        # add attributes to the subject element
     subject.attributes.append(subjectIdAttribute)
     subject.attributes.append(subjectQualifierAttribute)
-    # add the subject element to the request
-    request.subjects.append(subject)
+    subject.attributes.append(roleAttribute)
 
-    if resource_ids is not None:
-        # create the resource element
-        resource = Resource()
-        # create the resource attribute
-        resourceAttribute = Attribute()
-        resourceAttribute.attributeId = Identifiers.Resource.RESOURCE_ID
-        resourceAttribute.dataType = StringAttributeValue.IDENTIFIER
-        resourceAttribute.attributeValues.append(StringAttributeValue())
-        resourceAttribute.attributeValues[-1].value = resource_ids
-        # add attributes to the resource element
-        resource.attributes.append(resourceAttribute)
-        # add the resource element to the request
-        request.resources.append(resource)
+        # add the subject element to the request
+    request.subjects.append(subject)
 
     # create the resource element
     resource = Resource()
     # create the resource attribute
     resourceAttribute = Attribute()
-    resourceAttribute.attributeId = SERVICE_PROVIDER_ATTRIBUTE
+    resourceAttribute.attributeId = Identifiers.Resource.RESOURCE_ID
     resourceAttribute.dataType = StringAttributeValue.IDENTIFIER
     resourceAttribute.attributeValues.append(StringAttributeValue())
-    resourceAttribute.attributeValues[-1].value = resource_service_id
+    resourceAttribute.attributeValues[-1].value = resource_id
     # add attributes to the resource element
     resource.attributes.append(resourceAttribute)
     # add the resource element to the request
     request.resources.append(resource)
+
+    # create the resource element
+    #resource = Resource()
+    # create the resource attribute
+    #resourceAttribute = Attribute()
+    #resourceAttribute.attributeId = SERVICE_PROVIDER_ATTRIBUTE
+    #resourceAttribute.dataType = StringAttributeValue.IDENTIFIER
+    #resourceAttribute.attributeValues.append(StringAttributeValue())
+    #resourceAttribute.attributeValues[-1].value = resource_service_id
+    # add attributes to the resource element
+    #resource.attributes.append(resourceAttribute)
+    # add the resource element to the request
+    #request.resources.append(resource)
 
 
     # create the action element

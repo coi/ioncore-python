@@ -35,62 +35,32 @@ class UserTwo(ServiceProcess):
         # Service life cycle state. Initialize service here. Can use yields.
         pass
 
-
     @defer.inlineCallbacks
-    def test_authorized_user(self):
+    def authorized_user(self,org='ooi', role=['researcher'], resource_id='glider55', op='get_temp'):
         log.debug('test_authorized_user')
-        services = [
-            {'name':'useragent','module':'ion.agents.intelligent.user_agent','class':'UserAgentService'},
-            {'name':'resourceagent','module':'ion.agents.intelligent.resource_agent','class':'ResourceAgentService'},
-        ]
-
-        sup = yield self._spawn_processes(services)
-        #Uncomment the following line when using the eclipse debug server
-        #pydevd.settrace()
-        uasc = UserAgentServiceClient(proc=sup)
-        request_content = {'org':'ooi','resource_id':'glider55','op':'get_temp'}
-        permit_decision = yield uasc.service_request(request_content)
-        log.info(str(permit_decision))
-        print
+        uasc = UserAgentServiceClient(proc=self)
+        request_content = {'org':org,'resource_id':resource_id,'op':op, 'role':role}
+        response = yield uasc.service_request(request_content)
+        print(str(response))
         print
 
     @defer.inlineCallbacks
-    def test_unauthorized_user(self):
+    def unauthorized_user(self,org='ooi', role=['student'], resource_id='glider55', op='get_temp'):
         log.debug('test_unauthorized_user')
-        services = [
-            {'name':'useragent','module':'ion.agents.intelligent.user_agent','class':'UserAgentService'},
-            {'name':'resourceagent','module':'ion.agents.intelligent.resource_agent','class':'ResourceAgentService'},
-        ]
-
-        sup = yield self._spawn_processes(services)
-
-        #Uncomment the following line when using the eclipse debug server
-        #pydevd.settrace()
-        uasc = UserAgentServiceClient(proc=sup)
-        request_content = {'org':'nooi','resource_id':'glider55','op':'get_temp'}
+        uasc = UserAgentServiceClient(proc=self)
+        request_content = {'org':org,'resource_id':resource_id,'op':op, 'role':role}
         log.info('request to user agent'+str(request_content))
-        permit_decision = yield uasc.service_request(request_content)
-        log.info(str(permit_decision))
-        print
+        response = yield uasc.service_request(request_content)
+        log.info(str(response))
         print
 
     @defer.inlineCallbacks
-    def test_authorized_user_unauthorized_resource(self):
+    def test_authorized_user_unauthorized_resource(self,org='ooi', role=['student'], resource_id='glider56', op='get_temp'):
         log.debug('test_unauthorized_user_unauthorized_resource')
-        services = [
-            {'name':'useragent','module':'ion.agents.intelligent.user_agent','class':'UserAgentService'},
-            {'name':'resourceagent','module':'ion.agents.intelligent.resource_agent','class':'ResourceAgentService'},
-        ]
-
-        sup = yield self._spawn_processes(services)
-
-        #Uncomment the following line when using the eclipse debug server
-        #pydevd.settrace()
-        uasc = UserAgentServiceClient(proc=sup)
-        request_content = {'org':'ooi','resource_id':'glider56','op':'get_temp'}
-        permit_decision = yield uasc.service_request(request_content)
-        log.info(str(permit_decision))
-        print
+        uasc = UserAgentServiceClient(proc=self)
+        request_content = {'org':org,'resource_id':resource_id,'op':op, 'role':role}
+        response = yield uasc.service_request(request_content)
+        log.info(str(response))
         print
 
 # Spawn of the process using the module name

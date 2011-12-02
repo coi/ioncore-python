@@ -35,9 +35,9 @@ class ResourceAgentService(ServiceProcess):
     @defer.inlineCallbacks
     def op_execute_request(self, request_content, headers, msg):
         log.info('op_execute_request: '+str(request_content))       
-        permit_decision = policy_support.check(headers)
-        yield self.reply_ok(msg, permit_decision, {})
-
+        #permit_decision = policy_support.check(headers)
+        #yield self.reply_ok(msg, permit_decision, {})
+        yield self.reply_ok(msg, 'success', {})
 
 class ResourceAgentServiceClient(ServiceClient):
     """
