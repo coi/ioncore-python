@@ -36,7 +36,7 @@ def check(headers):
         else:
             log.info('role for user_id is ' + vars['role'])
     else:
-        role=headers['content']['role']
+        role=str(headers['content']['role'])
         try: 
             vars, plan = engine.prove_1_goal(agent+'.authorized_resource('+org+','+role+','+resource_id+','+op+',$permission)')
         except:
@@ -46,3 +46,6 @@ def check(headers):
             log.info(vars)
         
     return vars
+
+def store(headers):
+    log.info('store facts ' +str(headers))

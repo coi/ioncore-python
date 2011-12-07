@@ -14,6 +14,7 @@ from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.agents.intelligent.kb import policy_support
 
+REQUEST='request'
 class ResourceAgentService(ServiceProcess):
     """
     Example service interface
@@ -33,7 +34,7 @@ class ResourceAgentService(ServiceProcess):
         pass
 
     @defer.inlineCallbacks
-    def op_execute_request(self, request_content, headers, msg):
+    def op_service_request(self, request_content, headers, msg):
         log.info('op_execute_request: '+str(request_content))       
         #permit_decision = policy_support.check(headers)
         #yield self.reply_ok(msg, permit_decision, {})
@@ -51,14 +52,14 @@ class ResourceAgentServiceClient(ServiceClient):
         ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
-    def execute_request(self, request_content=None):
+    def request(self, request_content=None):
         yield self._check_init() 
-        (request_content, headers, msg) = yield self.rpc_send('execute_request',request_content)
+        (request_content, headers, msg) = yield self.rpc_send(request_content[REQUEST],request_content)
         log.info('Service reply: '+str(request_content))
         defer.returnValue(str(request_content))
         
     
-    def execute_request_deferred(self, text='Hi there requester'):
+    def request_deferred(self, text='Hi there requester'):
         return self.rpc_send('execute_request', text)
 
 # Spawn of the process using the module name

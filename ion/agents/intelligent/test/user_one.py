@@ -35,34 +35,33 @@ class UserOne(ServiceProcess):
         # Service life cycle state. Initialize service here. Can use yields.
         pass
 
-    @defer.inlineCallbacks
-    def authorized_user(self,org='nooi', role=['notaresearcher'], resource_id='glider55', op='get_temp'):
-        log.debug('test_authorized_user')
-        uasc = UserAgentServiceClient(proc=self)
-        request_content = {'org':org,'resource_id':resource_id,'op':op, 'role':role}
-        response = yield uasc.service_request(request_content)
-        print(str(response))
-        print
 
     @defer.inlineCallbacks
-    def unauthorized_user(self,org='ooi', role=['researcher'], resource_id='glider55', op='get_temp'):
-        log.debug('test_unauthorized_user')
+    def send_request(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id='glider56', op='get_temp',request='service_request'):
         uasc = UserAgentServiceClient(proc=self)
-        request_content = {'org':org,'resource_id':resource_id,'op':op, 'role':role}
-        log.info('request to user agent'+str(request_content))
-        response = yield uasc.service_request(request_content)
+        request_content = {'user_id': user_id, 'org':org, 'role':role, 'resource_id':resource_id,'op':op, 'request':request}
+        response = yield uasc.request(request_content)
         log.info(str(response))
         print
 
-    @defer.inlineCallbacks
-    def test_authorized_user_unauthorized_resource(self,org='ooi', role=['researcher'], resource_id='glider56', op='get_temp'):
-        log.debug('test_unauthorized_user_unauthorized_resource')
-        uasc = UserAgentServiceClient(proc=self)
-        request_content = {'org':org,'resource_id':resource_id,'op':op, 'role':role}
-        response = yield uasc.service_request(request_content)
-        log.info(str(response))
-        print
+    def authorized_user(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id='glider55', op='get_temp',request='service_request'):
+        log.debug('authorized_user')
+        self.send_request(user_id, org,role,resource_id,op,request)
+
+    def unauthorized_user(self, user_id='shenrie', org='ooi',role=['student'], resource_id='glider55', op='get_temp',request='service_request'):
+        log.debug('unauthorized_user')
+        self.send_request(user_id, org,role,resource_id,op,request)
+
+    def authorized_user_unauthorized_resource(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id='glider56', op='get_temp',request='service_request'):
+        self.send_request(user_id, org,role,resource_id,op,request)
+
+
+    def enroll(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id = 'SCILAB', op='enrollment_request',request='enroll'):
+        log.debug('test enroll')
+        #self.send_request(org,role,resource_id,op,request)
+        self.send_request(user_id, org,role,resource_id,op,request)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(UserOne)
 
+    

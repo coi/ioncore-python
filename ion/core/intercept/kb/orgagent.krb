@@ -1,0 +1,167 @@
+# $Id: useragent.krb 2011-12-06 pckediya $
+#
+#
+#
+##
+##COMMITMENT
+##
+detached_commitment
+	use detached_commitment($debtor,$creditor,$antecedent,$consequent)
+	when
+	    orgagent_facts.commitment($debtor,$creditor,$antecedent,$consequent)
+	    condition($antecedent)
+	    #orgagent_facts.stative(created,$debtor, $creditor, $antecedent, $consequent)
+
+#we expect formula to be generated from the following production rule
+# $event -> some_event
+# $stative -> (state,agent,agent,$formula,$formula)
+# $agent -> some_user_id
+# $formula -> $event|$stative|($formula)|($formula,OR,$formula)| ($formula,AND,$formula)
+#
+# some_event and some_user_id are string literals, example pay and jsmith
+#
+# examples:
+#	(a)
+#	(a, AND, b)
+#	(a, OR, b)
+#   (((a, AND, b), OR, (c, AND, d)), OR,((e, AND, f), OR, (g, OR, h)))
+#	(a, AND, (b,AND,(c,OR,(d,AND,e))))
+#	((b,AND,c),OR,(a,AND,d))
+##
+##SERVICE_INSTANCES
+##
+##
+serviceinstances
+	use service_instances($i)
+	when
+		$i in range(2,10)
+		notany
+			orgagent_facts.service_instances($i)
+##CONDITIONS
+##
+####
+####EVENT
+####
+
+condition_event
+	use condition($a)
+	when
+		orgagent_facts.event($a)
+
+condition_parenthetical_event
+	use condition(($a))
+	when
+		orgagent_facts.event($a)
+
+condition_commitment
+	use condition($a)
+	when
+	    check len($a) == 5
+	    python state,debtor,creditor,antecedent,consequent=$a
+	    $state=state
+	    $debtor=debtor
+	    $creditor=creditor
+	    $antecedent=antecedent
+	    $consequent=consequent
+	    orgagent_facts.stative($state,$debtor,$creditor,$antecedent,$consequent)
+
+
+predicate_condition
+	use condition($antecedent)
+	when
+	    python predicatetype,predicate,parameters=$antecedent
+	    check predicatetype=='predicate'
+	    $predicate=predicate
+	    $parameters=parameters
+	    python print "commitments antecedent", $antecedent, $predicate, $parameters
+	    orgagent_facts.$predicate($parameters)
+
+condition__predicate
+	use pcondition($a)
+	when
+	    orgagent_facts.predicate($b,$c)
+	    python print "h",$c
+	    orgagent_facts.$b($c)
+test_patterned_event
+	use pevent($a)
+	when
+	    python event_type, parameters=$a
+	    $event_type=event_type
+	    $parameters=parameters
+
+test_stative
+	use Xstative($a)
+	when
+	    orgagent_facts.stative($a)
+test_stative2
+	use Ostative($state,$debtor,$creditor,$antecedent,$consequent)
+	when
+	    orgagent_facts.stative($state,$debtor,$creditor,$antecedent,$consequent)
+
+####
+####EVENT
+####
+##
+##
+####
+####AND CONDITIONS
+####
+######
+######AND CONDITIONS BASE CASE
+######
+and_condition_event_base_case
+	use condition($a,AND,$b)
+	when
+		condition($a)
+		condition($b)
+and_condition_event_parenthetical_base_case
+	use condition(($a,AND,$b))
+	when
+		condition($a)
+		condition($b)
+####
+####AND CONDITIONS
+####
+##
+##
+####
+####OR CONDITIONS
+####
+######
+######OR CONDITIONS BASE CASE
+######
+or_condition_event_base_a
+	use condition($a,OR,$b)
+	when
+		condition($a)
+or_condition_event_base_b
+	use condition($a,OR,$b)
+	when
+		condition($b)
+or_condition_base_parenthetical_a
+	use condition(($a,OR,$b))
+	when
+		condition($a)
+or_condition_base_parenthetical_b
+	use condition(($a,OR,$b))
+	when
+		condition($b)
+
+####
+####OR CONDITIONS
+####
+##
+##CONDITIONS
+##
+
+
+#POWER
+power
+    use power($debtor, $creditor, $antecedent, $consequent)
+    when
+        orgagent_facts.power($debtor,$creditor,$antecedent,$consequent)
+
+power_dontcare
+    use power($debtor, $creditor, $antecedent, $consequent)
+    when
+        orgagent_facts.power($debtor,DONTCARE,$antecedent,$consequent)

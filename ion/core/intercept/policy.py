@@ -182,6 +182,7 @@ def load_roles_from_associations(asc):
 class PolicyInterceptor(EnvelopeInterceptor):
     def before(self, invocation):
         msg = invocation.content
+        self.governance(invocation)
         return self.is_authorized(msg, invocation)
 
     def after(self, invocation):
@@ -252,7 +253,6 @@ class PolicyInterceptor(EnvelopeInterceptor):
         service = rcvr.rsplit('.',1)[-1]
 
         operation = msg['op']
-
         log.info('Policy Interceptor: Authorization request for service [%s] operation [%s] user_id [%s] expiry [%s]' % (service, operation, user_id, expiry))
 
         if service in policy_dictionary:
@@ -302,7 +302,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
             else:
                 log.info('Policy Interceptor: operation not in policy dictionary.')
         else:
-            if service == 'resourceagent' and operation=='execute_request':
+            if (service == 'resourceagent' or service == 'useragent' or service == 'orgagent'):
                 #TODO get all the roles for a user
                 #user_roles=[]
                 #for role in role_user_dict:
@@ -311,13 +311,9 @@ class PolicyInterceptor(EnvelopeInterceptor):
                 #    derived_data['roles']=user_roles
                 #TODO get all the resources in the request
                 log.debug('checking XACML policy for message: '+ str(msg))
-                decision={'permit':False}
-                yield self.check_policies(msg,invocation,decision)
-                if decision['permit']:
-                    log.info('Policy Interceptor: Returning Authorized.')
-                else:
-                    log.info('Policy Interceptor: Returning Not Authorized.')
-                    defer.returnValue(invocation)
+                #decision={'permit':False}
+                yield self.check_policies(msg,invocation)
+                defer.returnValue(invocation)
 
         expiry_time = int(expiry)
         if (expiry_time > 0):
@@ -332,7 +328,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
         defer.returnValue(invocation)
 
     @defer.inlineCallbacks
-    def check_policies(self,msg,invocation,decision):
+    def check_policies(self,msg,invocation):
         requestCtx = request._createRequestCtx(msg)
         if requestCtx is None:
             log.debug('requestCtx is empty')
@@ -351,11 +347,11 @@ class PolicyInterceptor(EnvelopeInterceptor):
                     if str(result.decision) == Decision.DENY_STR:
                         break
                 if str(result.decision) == Decision.DENY_STR:
-                    decision['permit']=False
+                    log.info('Policy Interceptor: Returning Not Authorized.')
                     invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
                 else:
-                    decision['permit']=True
-            log.info('XACML Policy Interceptor permission: '+str(decision['permit']))
+                    log.info('Policy Interceptor: Returning Authorized.')
+            log.info('XACML Policy Interceptor permission: '+str(result.decision))
             defer.returnValue(invocation)
         yield (1,)
 
@@ -457,4 +453,3 @@ class PolicyInterceptor(EnvelopeInterceptor):
             self.find_uuids_traverse_gpbs(invocation, msg, obj, repo, user_id, resources, uuid_list)
         return uuid_list
                 
-

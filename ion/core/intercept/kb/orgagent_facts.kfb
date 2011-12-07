@@ -1,0 +1,33 @@
+# $Id: orgagent.kfb 2011-12-06 pckediya $
+# coding=utf-8
+
+
+# orgagent.service_instances
+service_instances(1)
+
+#orgagent_facts.commitment($debtor,$creditor,$antecedent,$consequent)
+#commitment(self, ooi, ooi_role($ionUserID,student), enroll($ionUserID, SCILAB,student))
+
+#commitment(self, ooi, ooi_role($ionUserID,researcher), (enroll, ($ionUserID, SCILAB,contributer)))
+predicate(enroll, (ionUserID, SCILAB,contributer))
+enroll(('ionUserID', 'SCILAB', 'contributer'))
+
+contribute(alice, dive, SCILAB, AUV512)
+
+commitment(SCILAB, ooi, '', ('predicate', 'enroll', ('ionUserID', 'SCILAB', 'student')))
+
+#commitment(anl, bob, a, "enroll('bob', 'contributer', 'anl')")
+#commitment((anl, bob, a, g))
+#commitment(anl)
+
+#orgagent_facts.event($event)
+event(a)
+event(b)
+event(c)
+event(d)
+stative(created, anl, bob, b, g)
+stative(created, anl, bob, (created, anl, bob, x, y), z)
+stative((created, anl, bob, (created, anl, bob, b, g), g))
+
+
+power(SCILAB, DONTCARE, enrollment_request, enroll)
