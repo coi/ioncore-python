@@ -182,7 +182,6 @@ def load_roles_from_associations(asc):
 class PolicyInterceptor(EnvelopeInterceptor):
     def before(self, invocation):
         msg = invocation.content
-        self.governance(invocation)
         return self.is_authorized(msg, invocation)
 
     def after(self, invocation):

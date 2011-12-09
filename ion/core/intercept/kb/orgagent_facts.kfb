@@ -9,9 +9,9 @@ service_instances(1)
 #commitment(self, ooi, ooi_role($ionUserID,student), enroll($ionUserID, SCILAB,student))
 
 #commitment(self, ooi, ooi_role($ionUserID,researcher), (enroll, ($ionUserID, SCILAB,contributer)))
-predicate(enroll, (ionUserID, SCILAB,contributer))
-enroll(('ionUserID', 'SCILAB', 'contributer'))
-
+#predicate(enroll, (ionUserID, SCILAB,contributer))
+#enroll(('ionUserID', 'SCILAB', 'contributer'))
+enrolled('shenrie')
 contribute(alice, dive, SCILAB, AUV512)
 
 commitment(SCILAB, ooi, '', ('predicate', 'enroll', ('ionUserID', 'SCILAB', 'student')))
@@ -30,4 +30,4 @@ stative(created, anl, bob, (created, anl, bob, x, y), z)
 stative((created, anl, bob, (created, anl, bob, b, g), g))
 
 
-power(SCILAB, DONTCARE, enrollment_request, enroll)
+power(SCILAB, DONTCARE, enroll, enroll)

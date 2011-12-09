@@ -6,84 +6,52 @@
 from __future__ import with_statement
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
-from pyke import knowledge_engine,  goal
-
-print str(__name__)
-import ion.util.ionlog
-log = ion.util.ionlog.getLogger(__name__)
-
-
+from pyke import *
 from twisted.internet import defer
 
-from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.agents.intelligent.kb import policy_support
+DROP='drop'
+my_engine = knowledge_engine.engine(__file__)
+        
 
-# Compile and load .krb files in same directory that I'm in (recursively).
-engine = knowledge_engine.engine(__file__)
-
-class GovernanceSupportService(ServiceProcess):
+class GovernanceSupport(object):
     """
     Example service interface
     """
-    # Declaration of service
-    declare = ServiceProcess.service_declare(name='governance_support',
-                                             version='0.1.0',
-                                             dependencies=[])
-
+    gov_engine=my_engine
     def __init__(self, *args, **kwargs):
-        # Service class initializer. Basic config, but no yields allowed.
-        ServiceProcess.__init__(self, *args, **kwargs)
-        log.info('GovernanceSupportService.__init__()')
+        log.info('GovernanceSupport.__init__()')
+        my_engine.reset()
+        my_engine.activate('orgagent')
 
-    def slc_init(self):
-        # Service life cycle state. Initialize service here. Can use yields.
-        pass
-
-    def hi(self, name):
-        print "hi " + name
-
-
-    @defer.inlineCallbacks
-    def op_check(self, request_content, headers, msg):
-        log.info('governance check request content: '+str(request_content))
-        #policy_response = policy_support.check(headers)
-        #if policy_response!='denied':
-        #    rasc = ResourceAgentServiceClient()
-        #    request_content['role']=policy_response['role']
-        #    log.info('request to resource agent '+str(request_content))
-        #    policy_response = yield rasc.execute_request(request_content)
-        yield self.reply_ok(msg, policy_response, {})
-
-    def checks(msg):
+    def checks(self,msg):
         '''
             This function runs the forward-chaining example (fc_example.krb).
         '''
-        print str(msg)
-        return
         user_id=msg['content']['user_id']
         org=msg['content']['org']
         role=msg['content']['role']
         resource_id = msg['content']['resource_id']
         op=msg['content']['op']
         agent=msg['receiver'].split(".")[1]
-        engine.reset()      # Allows us to run tests multiple times.
-
-        engine.activate(agent)  # Runs all applicable forward-chaining rules.
-
-        if agent == 'orgagents':
+        response=DROP
+          # Runs all applicable forward-chaining rules.
+        log.info('Governance applied on ' + user_id + ' '+ org + ' ' + str(role) + ' '+ resource_id + ' '+ op + ' '+ agent)
+        if agent == 'orgagent':
             try:
                 log.debug('orgagent governance being applied')
-                vars, plan = engine.prove_1_goal(agent+'.power('+resource_id+','+user_id+','+op+',$response)')
+                vars, plan = my_engine.prove_1_goal(agent+'.power('+resource_id+','+user_id+','+op+',$response)')
+                response=vars['response']
                 #vars, plan = engine.prove_1_goal(agent+'.has_authorization('+org+','+user_id+',$role)')
                 #vars, plan = engine.prove_1_goal(agent+'.has_commitment('+org+','+user_id+',$role)')
                 #vars, plan = engine.prove_1_goal(agent+'.has_sanction('+org+','+user_id+',$role)')
                 #vars, plan = engine.prove_1_goal(agent+'.has_prohibition('+org+','+user_id+',$role)')
             except:
-                return 'denied'
+                response = DROP
                 log.info('permission: ' + 'denied')
             else:
-                log.info('role for user_id is ' + vars['response'])
+                log.info('governance response is ' + response)
+                msg['content']['governance_response'] = response
+
 
         elif agent=='useragent':
             '''try:
@@ -94,7 +62,7 @@ class GovernanceSupportService(ServiceProcess):
                 log.info('permission: ' + 'denied')
             else:
                 log.info('role for user_id is ' + vars['role'])'''
-        if agent == 'resourceagent':
+        elif agent == 'resourceagent':
             '''role=str(msg['content']['role'])
             try:
                 vars, plan = engine.prove_1_goal(agent+'.authorized_resource('+org+','+role+','+resource_id+','+op+',$permission)')
@@ -114,30 +82,29 @@ class GovernanceSupportService(ServiceProcess):
                 log.info(vars)'''
             print 'i am here !!'
 
-        return vars
+        return response 
 
-    def store(headers):
-        log.info('store facts ' +str(headers))
+    def hi(self, name):
+        print "hi " + name
 
+    def store(self,kb_name,fact_name,arguments):
+        log.info('storing ' +fact_name + ' ('+str(arguments)+') ' + 'in ' + kb_name)
+        #my_engine.add_universal_fact(kb_name, fact_name, arguments)
+        my_engine.assert_(kb_name, fact_name, arguments)
+        log.info('stored ' +fact_name + str(arguments))
 
-class GovernanceSupportServiceClient(ServiceClient):
-    """
-    This is an exemplar service client that calls the user_agent service. It
-    makes service calls RPC style.
-    """
-    def __init__(self, proc=None, **kwargs):
-        if not 'targetname' in kwargs:
-            kwargs['targetname'] = "governance_support"
-        ServiceClient.__init__(self, proc, **kwargs)
+    def dump_universal_facts(self,kb_name):
+        return my_engine.get_kb(kb_name).dump_universal_facts()
 
+    def dump_specific_facts(self,kb_name):
+        return my_engine.get_kb(kb_name).dump_specific_facts()
 
-    @defer.inlineCallbacks
-    def check(self, request_content=None):
-        log.info('Governance check')
-        yield self._check_init()
-        (request_content, headers, msg) = yield self.rpc_send('check',request_content)
-        log.info('Governance Support reply: '+str(request_content))
-        defer.returnValue(str(request_content))
+    def list(self,kb_name,fact_name,arguments):
+        log.info('listing facts ' + kb_name+'.'+fact_name+arguments)
+        response=[]
+        with my_engine.prove_goal(kb_name+'.'+fact_name+arguments) as gen:
+            for vars, plan in gen:
+                log.info(str(vars))
+                response.append(vars)
+        return response
 
-# Spawn of the process using the module name
-factory = ProcessFactory(GovernanceSupportService)

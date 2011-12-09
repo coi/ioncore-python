@@ -15,19 +15,18 @@ from twisted.internet import defer
 
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.agents.intelligent.resource_agent import ResourceAgentServiceClient
-from ion.agents.intelligent.kb import policy_support
+from ion.core.intercept.governance_support import GovernanceSupport
 
-from ion.core.intercept.governance_support import GovernanceSupportServiceClient
-
-REQUEST='request'
-
+OP='op'
+DROP='drop'
+ENROLL='enroll'
+AGENT_NAME='orgagent'
 class OrgAgentService(ServiceProcess):
     """
     Example service interface
     """
     # Declaration of service
-    declare = ServiceProcess.service_declare(name='orgagent',
+    declare = ServiceProcess.service_declare(name=AGENT_NAME,
                                              version='0.1.0',
                                              dependencies=[])
 
@@ -38,6 +37,7 @@ class OrgAgentService(ServiceProcess):
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
+        self.governance_support = GovernanceSupport()
         pass
     
     def hi(self, name):
@@ -46,24 +46,40 @@ class OrgAgentService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_enroll(self, request_content, headers, msg):
-        log.info('enroll request content: '+str(request_content))
-
-        gsc = GovernanceSupportServiceClient(proc=self)
-        #pass the message to the gsc for governance interpretation
-        response=gsc.check(invocation.content)
-        print response
-
-        #policy_response = policy_support.check(headers)
-        #if policy_response!='denied':
-        #    rasc = ResourceAgentServiceClient()
-        #    request_content['role']=policy_response['role']
-        #    log.info('request to resource agent '+str(request_content))
-        #    policy_response = yield rasc.execute_request(request_content)
-        yield self.reply_ok(msg, response, {})
+        log.info('enrolling '+request_content['user_id'] + ' in org '+request_content['resource_id'])
+        self.store('enrolled',[request_content['resource_id']+','+request_content['user_id']])
+        yield self.reply_ok(msg, 'success', {})
 
     @defer.inlineCallbacks
-    def op_list_resources(self, request_content, headers, msg):
+    def op_contribute(self, request_content, headers, msg):
+        log.info('contributing '+str(request_content[resource_id]['RESOURCE']) + ' to org '+request_content[resource_id]['ORG'])
+        self.store('contributed',[request_content[user_id]+','+request_content[resource_id]['RESOURCE']+','+request_content[resource_id]['ORG']])
+        yield self.reply_ok(msg, 'success', {})
+
+    #@defer.inlineCallbacks
+    def op_list_resources(self,org):
         log.info('listing resources')
+        vars=self.governance_support.list(AGENT_NAME+'_facts','contributed','($user,$resource,'+org+')')
+        response=[]
+        for var in vars:
+            response.append([var['user'],var['resource']])
+        return response
+        #yield self.reply_ok(msg, resources, {})
+
+    #@defer.inlineCallbacks
+    def op_list_users(self,org):
+        log.info('listing users')
+        vars=self.governance_support.list(AGENT_NAME+'_facts','enrolled','('+org+',$user)')
+        response=[]
+        for var in vars:
+            response.append(var['user'])
+        return response
+
+        #yield self.reply_ok(msg, 'success', {})
+            
+
+    def store(self,fact_name,arguments):
+        self.governance_support.store(AGENT_NAME+'_facts',fact_name,arguments)
 
 class OrgAgentServiceClient(ServiceClient):
     """
@@ -80,7 +96,7 @@ class OrgAgentServiceClient(ServiceClient):
     def request(self, request_content=None):
         yield self._check_init()
         log.info('Org recieved: '+str(request_content))
-        (request_content, headers, msg) = yield self.rpc_send(request_content[REQUEST],request_content)
+        (request_content, headers, msg) = yield self.rpc_send(request_content[OP],request_content)
         log.info('Org reply: '+str(request_content))
         defer.returnValue(str(request_content))
 

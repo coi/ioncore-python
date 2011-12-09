@@ -37,29 +37,28 @@ class UserOne(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def send_request(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id='glider56', op='get_temp',request='service_request'):
+    def send_request(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id='glider56', op='get_temp',request_type='resource_request'):
         uasc = UserAgentServiceClient(proc=self)
-        request_content = {'user_id': user_id, 'org':org, 'role':role, 'resource_id':resource_id,'op':op, 'request':request}
+        request_content = {'user_id': user_id, 'org':org, 'role':role, 'resource_id':resource_id,'op':op, 'request_type':request_type}
         response = yield uasc.request(request_content)
         log.info(str(response))
         print
 
-    def authorized_user(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id='glider55', op='get_temp',request='service_request'):
+    def authorized_user(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id='glider55', op='get_temp',request_type='resource_request'):
         log.debug('authorized_user')
-        self.send_request(user_id, org,role,resource_id,op,request)
+        self.send_request(user_id, org,role,resource_id,op,request_type)
 
-    def unauthorized_user(self, user_id='shenrie', org='ooi',role=['student'], resource_id='glider55', op='get_temp',request='service_request'):
+    def unauthorized_user(self, user_id='shenrie', org='ooi',role=['student'], resource_id='glider55', op='get_temp',request_type='resource_request'):
         log.debug('unauthorized_user')
-        self.send_request(user_id, org,role,resource_id,op,request)
+        self.send_request(user_id, org,role,resource_id,op,request_type)
 
-    def authorized_user_unauthorized_resource(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id='glider56', op='get_temp',request='service_request'):
-        self.send_request(user_id, org,role,resource_id,op,request)
+    def authorized_user_unauthorized_resource(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id='glider56', op='get_temp',request_type='resource_request'):
+        self.send_request(user_id, org,role,resource_id,op,request_type)
 
 
-    def enroll(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id = 'SCILAB', op='enrollment_request',request='enroll'):
+    def enroll(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id = 'SCILAB', op='enroll',request_type='org_request'):
         log.debug('test enroll')
-        #self.send_request(org,role,resource_id,op,request)
-        self.send_request(user_id, org,role,resource_id,op,request)
+        self.send_request(user_id, org,role,resource_id,op,request_type)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(UserOne)

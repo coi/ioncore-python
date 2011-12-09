@@ -156,7 +156,7 @@ or_condition_base_parenthetical_b
 
 
 #POWER
-power
+power 
     use power($debtor, $creditor, $antecedent, $consequent)
     when
         orgagent_facts.power($debtor,$creditor,$antecedent,$consequent)

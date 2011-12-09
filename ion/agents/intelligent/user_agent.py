@@ -19,7 +19,7 @@ from ion.agents.intelligent.resource_agent import ResourceAgentServiceClient
 from ion.agents.intelligent.org_agent import OrgAgentServiceClient
 
 from ion.agents.intelligent.kb import policy_support
-REQUEST='request'
+REQUEST_TYPE='request_type'
 class UserAgentService(ServiceProcess):
     """
     Example service interface
@@ -43,10 +43,9 @@ class UserAgentService(ServiceProcess):
         print "hi " + name
         
     @defer.inlineCallbacks
-    def op_service_request(self, request_content, headers, msg):
-        log.info('op_service_request content: '+str(request_content))
-        log.info('op_service_request msg: '+str(msg))
-        log.info('op_service_request header: '+str(headers))
+    def op_resource_request(self, request_content, headers, msg):
+        log.info('resource request msg: '+str(msg))
+        log.info('resource request header: '+str(headers))
         rasc = ResourceAgentServiceClient()
         log.info('request to resource agent '+str(request_content))
         response = yield rasc.request(request_content)
@@ -56,10 +55,9 @@ class UserAgentService(ServiceProcess):
         yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
-    def op_enroll(self, request_content, headers, msg):
-        log.info('op_enroll content: '+str(request_content))
-        log.info('op_enroll msg: '+str(msg))
-        log.info('op_enroll header: '+str(headers))
+    def op_org_request(self, request_content, headers, msg):
+        log.info('org request msg: '+str(msg))
+        log.info('org request header: '+str(headers))
         oasc = OrgAgentServiceClient()
         log.info('request to org agent '+str(request_content))
         response = yield oasc.request(request_content)
@@ -67,6 +65,7 @@ class UserAgentService(ServiceProcess):
             response = 'failure'
             log.info('No response received from the org agent')
         yield self.reply_ok(msg, response, {})
+
 
 class UserAgentServiceClient(ServiceClient):
     """
@@ -82,8 +81,8 @@ class UserAgentServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def request(self, request_content=None):
         yield self._check_init()
-        log.info('requested ' + request_content[REQUEST])
-        (request_content, headers, msg) = yield self.rpc_send(request_content[REQUEST],request_content)
+        log.info('requested ' + request_content[REQUEST_TYPE])
+        (request_content, headers, msg) = yield self.rpc_send(request_content[REQUEST_TYPE],request_content)
         log.info('Service reply: '+str(request_content))
         defer.returnValue(str(request_content))
         

@@ -84,7 +84,8 @@
                                      AttributeId="urn:oasis:names:tc:xacml:1.0:ooici:subject-id-role"
                                      DataType="http://www.w3.org/2001/XMLSchema#string"/>
                                 <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-bag">
-                                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">student</AttributeValue>
+                                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">researcher</AttributeValue>
+
                                 </Apply>
             </Apply>
         </Condition>
