@@ -8,9 +8,9 @@
 detached_commitment
 	use detached_commitment($debtor,$creditor,$antecedent,$consequent)
 	when
-	    orgagent_facts.commitment($debtor,$creditor,$antecedent,$consequent)
+	    org_agent_facts.commitment($debtor,$creditor,$antecedent,$consequent)
 	    condition($antecedent)
-	    #orgagent_facts.stative(created,$debtor, $creditor, $antecedent, $consequent)
+	    #org_agent_facts.stative(created,$debtor, $creditor, $antecedent, $consequent)
 
 #we expect formula to be generated from the following production rule
 # $event -> some_event
@@ -36,7 +36,7 @@ serviceinstances
 	when
 		$i in range(2,10)
 		notany
-			orgagent_facts.service_instances($i)
+			org_agent_facts.service_instances($i)
 ##CONDITIONS
 ##
 ####
@@ -46,12 +46,12 @@ serviceinstances
 condition_event
 	use condition($a)
 	when
-		orgagent_facts.event($a)
+		org_agent_facts.event($a)
 
 condition_parenthetical_event
 	use condition(($a))
 	when
-		orgagent_facts.event($a)
+		org_agent_facts.event($a)
 
 condition_commitment
 	use condition($a)
@@ -63,7 +63,7 @@ condition_commitment
 	    $creditor=creditor
 	    $antecedent=antecedent
 	    $consequent=consequent
-	    orgagent_facts.stative($state,$debtor,$creditor,$antecedent,$consequent)
+	    org_agent_facts.stative($state,$debtor,$creditor,$antecedent,$consequent)
 
 
 predicate_condition
@@ -74,14 +74,14 @@ predicate_condition
 	    $predicate=predicate
 	    $parameters=parameters
 	    python print "commitments antecedent", $antecedent, $predicate, $parameters
-	    orgagent_facts.$predicate($parameters)
+	    org_agent_facts.$predicate($parameters)
 
 condition__predicate
 	use pcondition($a)
 	when
-	    orgagent_facts.predicate($b,$c)
+	    org_agent_facts.predicate($b,$c)
 	    python print "h",$c
-	    orgagent_facts.$b($c)
+	    org_agent_facts.$b($c)
 test_patterned_event
 	use pevent($a)
 	when
@@ -92,11 +92,11 @@ test_patterned_event
 test_stative
 	use Xstative($a)
 	when
-	    orgagent_facts.stative($a)
+	    org_agent_facts.stative($a)
 test_stative2
 	use Ostative($state,$debtor,$creditor,$antecedent,$consequent)
 	when
-	    orgagent_facts.stative($state,$debtor,$creditor,$antecedent,$consequent)
+	    org_agent_facts.stative($state,$debtor,$creditor,$antecedent,$consequent)
 
 ####
 ####EVENT
@@ -156,12 +156,22 @@ or_condition_base_parenthetical_b
 
 
 #POWER
-power 
+power
     use power($debtor, $creditor, $antecedent, $consequent)
     when
-        orgagent_facts.power($debtor,$creditor,$antecedent,$consequent)
+        org_agent_facts.power($debtor,$creditor,$antecedent,$consequent)
 
 power_dontcare
     use power($debtor, $creditor, $antecedent, $consequent)
     when
-        orgagent_facts.power($debtor,DONTCARE,$antecedent,$consequent)
+        org_agent_facts.power($debtor,DONTCARE,$antecedent,$consequent)
+
+authorization
+    use authorization($debtor, $creditor, $antecedent, $consequent)
+    when
+        org_agent_facts.authorization($debtor,$creditor,$antecedent,$consequent)
+
+authorization_dontcare
+    use authorization($debtor, $creditor, $antecedent, $consequent)
+    when
+        org_agent_facts.authorization($debtor,DONTCARE,$antecedent,$consequent)

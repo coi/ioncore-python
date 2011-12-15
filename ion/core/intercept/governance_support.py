@@ -21,71 +21,37 @@ class GovernanceSupport(object):
     def __init__(self, *args, **kwargs):
         log.info('GovernanceSupport.__init__()')
         my_engine.reset()
-        my_engine.activate('orgagent')
+        my_engine.activate('org_agent')
 
-    def checks(self,msg):
-        '''
-            This function runs the forward-chaining example (fc_example.krb).
-        '''
-        user_id=msg['content']['user_id']
-        org=msg['content']['org']
-        role=msg['content']['role']
-        resource_id = msg['content']['resource_id']
-        op=msg['content']['op']
-        agent=msg['receiver'].split(".")[1]
-        response=DROP
-          # Runs all applicable forward-chaining rules.
-        log.info('Governance applied on ' + user_id + ' '+ org + ' ' + str(role) + ' '+ resource_id + ' '+ op + ' '+ agent)
-        if agent == 'orgagent':
+    def checks(self,headers):
+        user_id=headers['user-id']
+        org='ooi'
+        subjectRoles=subjectRoles=['researcher']
+        resource_id = headers['receiver-name']
+        op=headers['op']
+        agent=headers['receiver'].split(".")[1]
+
+        # Runs all applicable forward-chaining rules.
+        log.info('Governance applied on ' + user_id + ' '+ org + ' ' + str(subjectRoles) + ' '+ resource_id + ' '+ op + ' '+ agent)
+        if agent == 'org_agent':
             try:
-                log.debug('orgagent governance being applied')
+                log.debug('checking if empowered')
                 vars, plan = my_engine.prove_1_goal(agent+'.power('+resource_id+','+user_id+','+op+',$response)')
-                response=vars['response']
-                #vars, plan = engine.prove_1_goal(agent+'.has_authorization('+org+','+user_id+',$role)')
-                #vars, plan = engine.prove_1_goal(agent+'.has_commitment('+org+','+user_id+',$role)')
-                #vars, plan = engine.prove_1_goal(agent+'.has_sanction('+org+','+user_id+',$role)')
-                #vars, plan = engine.prove_1_goal(agent+'.has_prohibition('+org+','+user_id+',$role)')
+                permission=vars['response']
+                log.info('org has power to ' + permission)
             except:
-                response = DROP
-                log.info('permission: ' + 'denied')
-            else:
-                log.info('governance response is ' + response)
-                msg['content']['governance_response'] = response
+                permission = DROP
+                log.info('no power')
+                try:
+                    log.debug('checking authorization')
+                    vars, plan = my_engine.prove_1_goal(agent+'.authorization('+resource_id+','+user_id+','+op+',$response)')
+                    permission=vars['response']
+                    log.info('org has authorizatoin to ' + permission)
+                except:
+                    log.info('no authorization')
 
 
-        elif agent=='useragent':
-            '''try:
-                log.debug('useragents governance being applied')
-                vars, plan = engine.prove_1_goal(agent+'.authorized_user('+org+','+user_id+',$role)')
-            except:
-                return 'denied'
-                log.info('permission: ' + 'denied')
-            else:
-                log.info('role for user_id is ' + vars['role'])'''
-        elif agent == 'resourceagent':
-            '''role=str(msg['content']['role'])
-            try:
-                vars, plan = engine.prove_1_goal(agent+'.authorized_resource('+org+','+role+','+resource_id+','+op+',$permission)')
-            except:
-                return 'denied'
-                log.info('permission: ' + 'denied')
-            else:
-                log.info(vars)'''
-        else :
-            '''role=str(msg['content']['role'])
-            try:
-                vars, plan = engine.prove_1_goal(agent+'.authorized_resource('+org+','+role+','+resource_id+','+op+',$permission)')
-            except:
-                return 'denied'
-                log.info('permission: ' + 'denied')
-            else:
-                log.info(vars)'''
-            print 'i am here !!'
-
-        return response 
-
-    def hi(self, name):
-        print "hi " + name
+        return permission
 
     def store(self,kb_name,fact_name,arguments):
         log.info('storing ' +fact_name + ' ('+str(arguments)+') ' + 'in ' + kb_name)

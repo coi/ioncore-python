@@ -10,9 +10,11 @@ service_instances(1)
 
 #commitment(self, ooi, ooi_role($ionUserID,researcher), (enroll, ($ionUserID, SCILAB,contributer)))
 #predicate(enroll, (ionUserID, SCILAB,contributer))
-#enroll(('ionUserID', 'SCILAB', 'contributer'))
-enrolled('shenrie')
-contribute(alice, dive, SCILAB, AUV512)
+
+#mpsingh is enrolled in SCILAB
+enrolled(mpsingh,SCLIAB)
+#alice contributes glider55 with capability get_temp to CHUSLAB
+contributed(alice, glider55,get_temp, CHUSLAB)
 
 commitment(SCILAB, ooi, '', ('predicate', 'enroll', ('ionUserID', 'SCILAB', 'student')))
 
@@ -31,3 +33,11 @@ stative((created, anl, bob, (created, anl, bob, b, g), g))
 
 
 power(SCILAB, DONTCARE, enroll, enroll)
+power(SCILAB, DONTCARE, contribute, contribute)
+
+authorization(SCILAB, DONTCARE, list_resources, list_resources)
+authorization(SCILAB, DONTCARE, list_users, list_users)
+authorization(SCILAB, DONTCARE, validate_token, validate_token)
+authorization(SCILAB, DONTCARE, validate_enrollment, validate_enrollment)
+
+token(IPC420, SCILAB)

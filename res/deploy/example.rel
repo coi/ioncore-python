@@ -8,7 +8,6 @@
     "ioncore" : "0.1",
     "apps":[
         {'name':'ccagent', 'version':'0.1', 'config':{'hello':'one'}},
-        {'name':'example', 'version':'0.1', 'config':{'hello':'one'}},
-        {'name':'example', 'version':'0.1', 'config':{'hello':'one'}, 'args':{'more':'here'}, 'mult':True},
+        {'name':'user_agent', 'version':'0.1', 'config':{'hello':'one'}},
     ]
 }

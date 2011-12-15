@@ -79,14 +79,13 @@
             </Apply>
         </Condition-->
         <Condition>
-            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-at-least-one-member-of">
-                                <SubjectAttributeDesignator
-                                     AttributeId="urn:oasis:names:tc:xacml:1.0:ooici:subject-id-role"
-                                     DataType="http://www.w3.org/2001/XMLSchema#string"/>
-                                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-bag">
-                                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">researcher</AttributeValue>
-
-                                </Apply>
+            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+               <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
+                   <SubjectAttributeDesignator
+                       AttributeId="urn:oasis:names:tc:xacml:1.0:ooici:token"
+                       DataType="http://www.w3.org/2001/XMLSchema#string"/>
+               </Apply>
+               <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">IPC420</AttributeValue>
             </Apply>
         </Condition>
         <!--Condition>

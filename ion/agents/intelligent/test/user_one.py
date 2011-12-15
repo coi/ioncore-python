@@ -22,7 +22,7 @@ class UserOne(ServiceProcess):
     """
     Testing example user agent service.
     """
-    declare = ServiceProcess.service_declare(name='userone',
+    declare = ServiceProcess.service_declare(name='user_one',
                                              version='0.1.0',
                                              dependencies=[])
 
@@ -37,28 +37,38 @@ class UserOne(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def send_request(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id='glider56', op='get_temp',request_type='resource_request'):
+    def send_request(self, user_id='shenrie', resource_id='glider56', action='get_temp',op='resource_request',content={}):
         uasc = UserAgentServiceClient(proc=self)
-        request_content = {'user_id': user_id, 'org':org, 'role':role, 'resource_id':resource_id,'op':op, 'request_type':request_type}
-        response = yield uasc.request(request_content)
-        log.info(str(response))
+        headers={'user-id':user_id, 'content' : {'resource_id':resource_id,'action':action, 'content':content}, 'receiver-name':user_id}
+        response  = yield uasc.request(op, headers)
+        log.info('response: '+str(response))
         print
 
-    def authorized_user(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id='glider55', op='get_temp',request_type='resource_request'):
-        log.debug('authorized_user')
-        self.send_request(user_id, org,role,resource_id,op,request_type)
-
-    def unauthorized_user(self, user_id='shenrie', org='ooi',role=['student'], resource_id='glider55', op='get_temp',request_type='resource_request'):
-        log.debug('unauthorized_user')
-        self.send_request(user_id, org,role,resource_id,op,request_type)
-
-    def authorized_user_unauthorized_resource(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id='glider56', op='get_temp',request_type='resource_request'):
-        self.send_request(user_id, org,role,resource_id,op,request_type)
+    def request_resource(self, token='IPC420', user_id='shenrie', resource_id='glider55', action='get_temp', op='resource_request'):
+        log.info('authorized user requests '+ action +' on '+resource_id)
+        self.send_request(user_id, resource_id, action, op, {'token':token})
 
 
-    def enroll(self, user_id='shenrie', org='ooi', role=['researcher'], resource_id = 'SCILAB', op='enroll',request_type='org_request'):
-        log.debug('test enroll')
-        self.send_request(user_id, org,role,resource_id,op,request_type)
+    def enroll(self, user_id='shenrie', resource_id = 'SCILAB', action='enroll', op='org_request'):
+        log.info('user requests enroll')
+        self.send_request(user_id, resource_id, action, op)
+
+    def list_resources(self, resource_id = 'SCILAB', user_id='shenrie', action='list_resources', op='org_request'):
+        log.info('user requests list of resources from ' + resource_id)
+        self.send_request(user_id, resource_id, action, op)
+
+    def list_users(self,  resource_id = 'SCILAB', user_id='shenrie', action='list_users', op='org_request'):
+        log.info('user requests list of resources from ' + resource_id)
+        self.send_request(user_id, resource_id, action, op)
+
+    def validate_token(self, token='IPC420', user_id='shenrie', resource_id = 'SCILAB', action='validate_token', op='org_request'):
+        log.info('user requests list of resources from ' + resource_id)
+        content={'token':token}
+        self.send_request(user_id, resource_id, action,op, content)
+
+    def validate_enrollment(self, user_id='shenrie', resource_id = 'SCILAB',action='validate_enrollment', op='org_request'):
+        log.info('user requests list of resources from ' + resource_id)
+        self.send_request(user_id, resource_id, action, op)
 
 # Spawn of the process using the module name
 factory = ProcessFactory(UserOne)

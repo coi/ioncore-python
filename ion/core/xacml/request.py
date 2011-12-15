@@ -32,13 +32,14 @@ THIS_DIR = path.dirname(__file__)
 XACML_ION_POLICY_FILENAME='ion_agent_policies.xml'
 XACML_POLICY_FILEPATH=path.join(THIS_DIR, XACML_ION_POLICY_FILENAME)
 
-SERVICE_PROVIDER_ATTRIBUTE_ID="urn:oasis:names:tc:xacml:1.0:ooici:resource:service-provider"
+TOKEN_ATTRIBUTE_ID="urn:oasis:names:tc:xacml:1.0:ooici:token"
 ROLE_ATTRIBUTE_ID='urn:oasis:names:tc:xacml:1.0:ooici:subject-id-role'
 #"""XACML DATATYPES"""
 attributeValueFactory = AttributeValueClassFactory()
 AnyUriAttributeValue = attributeValueFactory(AttributeValue.ANY_TYPE_URI)
 StringAttributeValue = attributeValueFactory(AttributeValue.STRING_TYPE_URI)
 
+AGENT_NAME='org_agent'
 
 
 def _createPDP():
@@ -46,18 +47,17 @@ def _createPDP():
         pdp = PDP.fromPolicySource(XACML_POLICY_FILEPATH, ReaderFactory)
         return pdp
 
-def _createRequestCtx(msg):
-    print 'role ' + str(msg['content']['role'])
-    if msg['content']['role'] is None:
-        log.warn('empty request created')
-        print 'no role'
-        return
+def _createRequestCtx(invocation):
+    headers=invocation.content
+    log.info('here '+str(headers))
 
-    subject_id=msg['user-id']
-    org=msg['content']['org']
-    subjectRoles=msg['content']['role']
-    resource_id=msg['content']['resource_id']
-    action_id=msg['content']['op']
+    subject_id=headers['user-id']
+    resource_id=headers['receiver-name']
+    action_id=headers['op']
+
+    #calculate the following
+    org='ooi'
+    subjectRoles=['researcher']
 
     print subject_id + " - " + org + " - "+ str(subjectRoles)+" - "+resource_id+" - "+action_id
     #agent_id=msg['receiver'].split(".")[1]
@@ -81,6 +81,7 @@ def _createRequestCtx(msg):
     subjectIdAttribute.attributeValues.append(StringAttributeValue())
     subjectIdAttribute.attributeValues[-1].value = subject_id
     log.debug('added data and type to subject attribute')
+
         # create subject qualifier attribute and populate it with appropriate data
     subjectQualifierAttribute = Attribute()
     log.debug('empty attribute created')
@@ -89,6 +90,24 @@ def _createRequestCtx(msg):
     subjectQualifierAttribute.attributeValues.append(StringAttributeValue())
     subjectQualifierAttribute.attributeValues[-1].value = org
     log.debug('added data and type to subject qualifier attribute')
+
+        # create token attribute and populate it with appropriate data
+    token=''
+    if 'content' in headers:
+        if 'token' in headers['content']:
+            token=headers['content']['token']
+            log.info('token is '+token)
+
+    subjectTokenAttribute = Attribute()
+    log.debug('empty token attribute created')
+    subjectTokenAttribute.attributeId = TOKEN_ATTRIBUTE_ID
+    subjectTokenAttribute.dataType = StringAttributeValue.IDENTIFIER
+    subjectTokenAttribute.attributeValues.append(StringAttributeValue())
+    subjectTokenAttribute.attributeValues[-1].value = token
+    log.debug('added data and type to subject token attribute')
+
+
+
 
 # create role attribute for the subject's, possibly, multiple roles
     for role in subjectRoles:
@@ -102,6 +121,7 @@ def _createRequestCtx(msg):
         # add attributes to the subject element
     subject.attributes.append(subjectIdAttribute)
     subject.attributes.append(subjectQualifierAttribute)
+    subject.attributes.append(subjectTokenAttribute)
     subject.attributes.append(roleAttribute)
 
         # add the subject element to the request
@@ -145,4 +165,4 @@ def _createRequestCtx(msg):
     # add attributes to the action element
     request.action.attributes.append(actionAttribute)
     return request
-  
+

@@ -18,18 +18,16 @@ from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.agents.intelligent.resource_agent import ResourceAgentServiceClient
 from ion.agents.intelligent.org_agent import OrgAgentServiceClient
 
-from ion.agents.intelligent.kb import policy_support
-REQUEST_TYPE='request_type'
+AGENT_NAME='user_agent'
+
 class UserAgentService(ServiceProcess):
     """
     Example service interface
     """
     # Declaration of service
-    declare = ServiceProcess.service_declare(name='useragent',
+    declare = ServiceProcess.service_declare(name=AGENT_NAME,
                                              version='0.1.0',
                                              dependencies=[])
-    token=''
-
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
         ServiceProcess.__init__(self, *args, **kwargs)
@@ -39,28 +37,25 @@ class UserAgentService(ServiceProcess):
         # Service life cycle state. Initialize service here. Can use yields.
         pass
     
-    def hi(self, name):
-        print "hi " + name
-        
     @defer.inlineCallbacks
-    def op_resource_request(self, request_content, headers, msg):
-        log.info('resource request msg: '+str(msg))
-        log.info('resource request header: '+str(headers))
+    def op_resource_request(self, content, headers, msg):
+        op=content['action']
+        headers={'receiver-name':content['resource_id'], 'op':op, 'content':content['content'], 'user-id':headers['user-id']}
+
         rasc = ResourceAgentServiceClient()
-        log.info('request to resource agent '+str(request_content))
-        response = yield rasc.request(request_content)
+        response = yield rasc.request(op,headers)
         if response is None:
             response = 'failure'
             log.info('No response received from the resource agent')
         yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
-    def op_org_request(self, request_content, headers, msg):
-        log.info('org request msg: '+str(msg))
-        log.info('org request header: '+str(headers))
+    def op_org_request(self, content, headers, msg):
+        op=content['action']
+        headers={'receiver-name':content['resource_id'], 'op':op, 'content':content['content'], 'user-id':headers['user-id']}
+
         oasc = OrgAgentServiceClient()
-        log.info('request to org agent '+str(request_content))
-        response = yield oasc.request(request_content)
+        response = yield oasc.request(op,headers)
         if response is None:
             response = 'failure'
             log.info('No response received from the org agent')
@@ -69,29 +64,25 @@ class UserAgentService(ServiceProcess):
 
 class UserAgentServiceClient(ServiceClient):
     """
-    This is an exemplar service client that calls the user_agent service. It
+    This service client calls the user_agent service. It
     makes service calls RPC style.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "useragent"
+            kwargs['targetname'] = AGENT_NAME
         ServiceClient.__init__(self, proc, **kwargs)
         
 
     @defer.inlineCallbacks
-    def request(self, request_content=None):
+    def request(self, op, headers=None):
         yield self._check_init()
-        log.info('requested ' + request_content[REQUEST_TYPE])
-        (request_content, headers, msg) = yield self.rpc_send(request_content[REQUEST_TYPE],request_content)
-        log.info('Service reply: '+str(request_content))
-        defer.returnValue(str(request_content))
+        (content, headers, msg) = yield self.rpc_send(op,headers['content'],headers)
+        defer.returnValue(str(content))
         
     
     def request_deferred(self, request=None):
         return self.rpc_send('service_request', request)
 
-    def hi(self, name):
-        print "hi " + name
 # Spawn of the process using the module name
 factory = ProcessFactory(UserAgentService)
 

@@ -19,8 +19,7 @@ from ion.core.intercept.governance_support import GovernanceSupport
 
 OP='op'
 DROP='drop'
-ENROLL='enroll'
-AGENT_NAME='orgagent'
+AGENT_NAME='org_agent'
 class OrgAgentService(ServiceProcess):
     """
     Example service interface
@@ -40,43 +39,65 @@ class OrgAgentService(ServiceProcess):
         self.governance_support = GovernanceSupport()
         pass
     
-    def hi(self, name):
-        print "hi " + name
         
 
     @defer.inlineCallbacks
-    def op_enroll(self, request_content, headers, msg):
-        log.info('enrolling '+request_content['user_id'] + ' in org '+request_content['resource_id'])
-        self.store('enrolled',[request_content['resource_id']+','+request_content['user_id']])
+    def op_enroll(self, content, headers, msg):
+        log.info('enrolling '+headers['user-id'] + ' in org '+headers['receiver-name'])
+        self.store('enrolled',[headers['user-id'],headers['receiver-name']])
+        yield self.reply_ok(msg, {'token':'IPC420'}, {})
+
+    @defer.inlineCallbacks
+    def op_contribute(self, content, headers, msg):
+        log.info(headers['user-id']+' contributing '+str(content['resource_id'])+', action '+ str(content['action'])+ ' to org '+headers['receiver-name'])
+        self.store('contributed',[headers['user-id'],content['resource_id'],content['action'],headers['receiver-name']])
         yield self.reply_ok(msg, 'success', {})
 
     @defer.inlineCallbacks
-    def op_contribute(self, request_content, headers, msg):
-        log.info('contributing '+str(request_content[resource_id]['RESOURCE']) + ' to org '+request_content[resource_id]['ORG'])
-        self.store('contributed',[request_content[user_id]+','+request_content[resource_id]['RESOURCE']+','+request_content[resource_id]['ORG']])
-        yield self.reply_ok(msg, 'success', {})
-
-    #@defer.inlineCallbacks
-    def op_list_resources(self,org):
-        log.info('listing resources')
-        vars=self.governance_support.list(AGENT_NAME+'_facts','contributed','($user,$resource,'+org+')')
+    def op_list_resources(self, content, headers, msg):
+        org = headers['receiver-name']
+        log.info('listing resources for ' + org)
+        vars=self.governance_support.list(AGENT_NAME+'_facts','contributed','($user,$resource,$action,'+org+')')
         response=[]
         for var in vars:
-            response.append([var['user'],var['resource']])
-        return response
-        #yield self.reply_ok(msg, resources, {})
+            response.append([var['user'],var['resource'],var['action']])
+        yield self.reply_ok(msg, response, {})
 
-    #@defer.inlineCallbacks
-    def op_list_users(self,org):
-        log.info('listing users')
-        vars=self.governance_support.list(AGENT_NAME+'_facts','enrolled','('+org+',$user)')
+    @defer.inlineCallbacks
+    def op_list_users(self, content, headers, msg):
+        org=headers['receiver-name']
+        log.info('listing users in ' + org)
+        vars=self.governance_support.list(AGENT_NAME+'_facts','enrolled','($user,'+org+')')
         response=[]
         for var in vars:
             response.append(var['user'])
-        return response
+        yield self.reply_ok(msg, response, {})
 
-        #yield self.reply_ok(msg, 'success', {})
-            
+    @defer.inlineCallbacks
+    def op_validate_token(self, content, headers, msg):
+        token=content['token']
+        org=headers['receiver-name']
+        log.info('validating token ' + token)
+        vars=self.governance_support.list(AGENT_NAME+'_facts','token','($token,'+org+')')
+        response=False
+        for var in vars:
+            if token==var['token']:
+                response=True
+                break
+        yield self.reply_ok(msg, response, {})
+
+    @defer.inlineCallbacks
+    def op_validate_enrollment(self, content, headers, msg):
+        user_id=headers['user-id']
+        org=headers['receiver-name']
+        log.info('validating user ' + user_id)
+        vars=self.governance_support.list(AGENT_NAME+'_facts','enrolled','($user,'+org+')')
+        response=False
+        for var in vars:
+            if user_id==var['user']:
+                response=True
+                break
+        yield self.reply_ok(msg, response, {})
 
     def store(self,fact_name,arguments):
         self.governance_support.store(AGENT_NAME+'_facts',fact_name,arguments)
@@ -88,24 +109,21 @@ class OrgAgentServiceClient(ServiceClient):
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "orgagent"
+            kwargs['targetname'] = AGENT_NAME
         ServiceClient.__init__(self, proc, **kwargs)
         
 
     @defer.inlineCallbacks
-    def request(self, request_content=None):
-        yield self._check_init()
-        log.info('Org recieved: '+str(request_content))
-        (request_content, headers, msg) = yield self.rpc_send(request_content[OP],request_content)
-        log.info('Org reply: '+str(request_content))
-        defer.returnValue(str(request_content))
+    def request(self, op, headers=None):
+         yield self._check_init()
+         log.info('here headers '+ str(headers) + ' op '+op)
+         (content, headers, msg) = yield self.rpc_send(op,headers['content'],headers)
+         defer.returnValue(str(content))
 
     
     def request_deferred(self, request=None):
         return self.rpc_send('service_request', request)
 
-    def hi(self, name):
-        print "hi " + name
 # Spawn of the process using the module name
 factory = ProcessFactory(OrgAgentService)
 

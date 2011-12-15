@@ -181,14 +181,14 @@ def load_roles_from_associations(asc):
 
 class PolicyInterceptor(EnvelopeInterceptor):
     def before(self, invocation):
-        msg = invocation.content
-        return self.is_authorized(msg, invocation)
+        headers = invocation.content
+        return self.is_authorized(headers, invocation)
 
     def after(self, invocation):
         return invocation
 
     @defer.inlineCallbacks
-    def is_authorized(self, msg, invocation):
+    def is_authorized(self, headers, invocation):
         """
         @brief Policy enforcement method which implements the functionality
             conceptualized as the policy decision point (PDP).
@@ -206,35 +206,35 @@ class PolicyInterceptor(EnvelopeInterceptor):
         required role.
         Role precedence from lower to higher is:
             ANONYMOUS, AUTHORIZED, OWNER, ADMIN
-        @param msg: message content from invocation
+        @param headers: message content from invocation
         @param invocation: invocation object passed on interceptor stack.
         @return: invocation object indicating status of authority check
         """
 
         # Ignore messages that are not of performative 'request'
-        if msg.get('performative', None) != 'request':
+        if headers.get('performative', None) != 'request':
             defer.returnValue(invocation)
 
         # Reject improperly defined messages
-        if not 'user-id' in msg:
-            log.error("Policy Interceptor: Rejecting improperly defined message missing user-id [%s]." % str(msg))
+        if not 'user-id' in headers:
+            log.error("Policy Interceptor: Rejecting improperly defined message missing user-id [%s]." % str(headers))
             invocation.drop(note='Error: no user-id defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             defer.returnValue(invocation)
-        if not 'expiry' in msg:
-            log.error("Policy Interceptor: Rejecting improperly defined message missing expiry [%s]." % str(msg))
+        if not 'expiry' in headers:
+            log.error("Policy Interceptor: Rejecting improperly defined message missing expiry [%s]." % str(headers))
             invocation.drop(note='Error: no expiry defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             defer.returnValue(invocation)
-        if not 'receiver' in msg:
-            log.error("Policy Interceptor: Rejecting improperly defined message missing receiver [%s]." % str(msg))
+        if not 'receiver' in headers:
+            log.error("Policy Interceptor: Rejecting improperly defined message missing receiver [%s]." % str(headers))
             invocation.drop(note='Error: no receiver defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             defer.returnValue(invocation)
-        if not 'op' in msg:
-            log.error("Policy Interceptor: Rejecting improperly defined message missing op [%s]." % str(msg))
+        if not 'op' in headers:
+            log.error("Policy Interceptor: Rejecting improperly defined message missing op [%s]." % str(headers))
             invocation.drop(note='Error: no op defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             defer.returnValue(invocation)
 
-        user_id = msg['user-id']
-        expirystr = msg['expiry']
+        user_id = headers['user-id']
+        expirystr = headers['expiry']
 
         if not type(expirystr) is str:
             log.error("Policy Interceptor: Rejecting improperly defined message with bad expiry [%s]." % str(expirystr))
@@ -248,10 +248,10 @@ class PolicyInterceptor(EnvelopeInterceptor):
             invocation.drop(note='Error: expiry improperly defined in message header!', code=Invocation.CODE_BAD_REQUEST)
             defer.returnValue(invocation)
 
-        rcvr = msg['receiver']
+        rcvr = headers['receiver']
         service = rcvr.rsplit('.',1)[-1]
 
-        operation = msg['op']
+        operation = headers['op']
         log.info('Policy Interceptor: Authorization request for service [%s] operation [%s] user_id [%s] expiry [%s]' % (service, operation, user_id, expiry))
 
         if service in policy_dictionary:
@@ -283,7 +283,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
                             break
 
                     if isOwnershipPolicy == True:
-                        return_uuid_list = self.find_uuids(invocation, msg, user_id, service_list[operation]['resources'])
+                        return_uuid_list = self.find_uuids(invocation, headers, user_id, service_list[operation]['resources'])
                         if invocation.status != Invocation.STATUS_PROCESS:
                             log.warn('Policy Interceptor: Authentication failed for service [%s] operation [%s] resource [%s] user_id [%s] expiry [%s] for role [OWNER].' % (service, operation, '*', user_id, expiry))
                             defer.returnValue(invocation)
@@ -301,7 +301,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
             else:
                 log.info('Policy Interceptor: operation not in policy dictionary.')
         else:
-            if (service == 'resourceagent' or service == 'useragent' or service == 'orgagent'):
+            if (service == 'resource_agent' or service == 'user_agent' or service == 'org_agent'):
                 #TODO get all the roles for a user
                 #user_roles=[]
                 #for role in role_user_dict:
@@ -309,9 +309,9 @@ class PolicyInterceptor(EnvelopeInterceptor):
                 #        user_roles.append(user_id)
                 #    derived_data['roles']=user_roles
                 #TODO get all the resources in the request
-                log.debug('checking XACML policy for message: '+ str(msg))
+                log.debug('checking XACML policy for message: '+ str(headers))
                 #decision={'permit':False}
-                yield self.check_policies(msg,invocation)
+                yield self.check_policies(invocation)
                 defer.returnValue(invocation)
 
         expiry_time = int(expiry)
@@ -327,8 +327,8 @@ class PolicyInterceptor(EnvelopeInterceptor):
         defer.returnValue(invocation)
 
     @defer.inlineCallbacks
-    def check_policies(self,msg,invocation):
-        requestCtx = request._createRequestCtx(msg)
+    def check_policies(self,invocation):
+        requestCtx = request._createRequestCtx(invocation)
         if requestCtx is None:
             log.debug('requestCtx is empty')
             invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)

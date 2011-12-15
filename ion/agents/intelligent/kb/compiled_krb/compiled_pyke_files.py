@@ -14,13 +14,13 @@ except NameError:
 def get_target_pkg():
     return target_pkg.target_pkg(__name__, __file__, pyke_version, loader, {
          ('ion.agents.intelligent.kb', '', 'useragent.krb'):
-           [1318734033.253675, 'useragent_bc.py'],
+           [1320829972.1435621, 'useragent_bc.py'],
          ('ion.agents.intelligent.kb', '', 'resourceagent.krb'):
-           [1318734033.2626281, 'resourceagent_bc.py'],
+           [1320829972.1518281, 'resourceagent_bc.py'],
          ('ion.agents.intelligent.kb', '', 'useragent_facts.kfb'):
-           [1318734033.2649851, 'useragent_facts.fbc'],
+           [1320829972.1541989, 'useragent_facts.fbc'],
          ('ion.agents.intelligent.kb', '', 'resourceagent_facts.kfb'):
-           [1318734033.265934, 'resourceagent_facts.fbc'],
+           [1320829972.1559589, 'resourceagent_facts.fbc'],
         },
         compiler_version)
 

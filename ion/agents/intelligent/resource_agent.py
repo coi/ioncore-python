@@ -14,16 +14,15 @@ from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.agents.intelligent.kb import policy_support
 
-REQUEST='request'
+AGENT_NAME='resource_agent'
 class ResourceAgentService(ServiceProcess):
     """
     Example service interface
     """
     # Declaration of service
-    declare = ServiceProcess.service_declare(name='resourceagent',
+    declare = ServiceProcess.service_declare(name=AGENT_NAME,
                                              version='0.1.0',
                                              dependencies=[])
-
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
         ServiceProcess.__init__(self, *args, **kwargs)
@@ -34,11 +33,8 @@ class ResourceAgentService(ServiceProcess):
         pass
 
     @defer.inlineCallbacks
-    def op_service_request(self, request_content, headers, msg):
-        log.info('op_execute_request: '+str(request_content))       
-        #permit_decision = policy_support.check(headers)
-        #yield self.reply_ok(msg, permit_decision, {})
-        yield self.reply_ok(msg, 'success', {})
+    def op_get_temp(self, content, headers, msg):
+        yield self.reply_ok(msg, 'temperature on '+headers['receiver-name']+ ' is 13 degrees fahrenheit', {})
 
 class ResourceAgentServiceClient(ServiceClient):
     """
@@ -48,16 +44,14 @@ class ResourceAgentServiceClient(ServiceClient):
     def __init__(self, proc=None, **kwargs):
         #print proc + 'helloSC kwargs are' + kwargs
         if not 'targetname' in kwargs:
-            kwargs['targetname'] = "resourceagent"
+            kwargs['targetname'] = AGENT_NAME
         ServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
-    def request(self, request_content=None):
-        yield self._check_init() 
-        (request_content, headers, msg) = yield self.rpc_send(request_content[REQUEST],request_content)
-        log.info('Service reply: '+str(request_content))
-        defer.returnValue(str(request_content))
-        
+    def request(self, op, headers=None):
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send(op,headers['content'],headers)
+        defer.returnValue(str(content))
     
     def request_deferred(self, text='Hi there requester'):
         return self.rpc_send('execute_request', text)
