@@ -252,7 +252,7 @@ class PolicyInterceptor(EnvelopeInterceptor):
         service = rcvr.rsplit('.',1)[-1]
 
         operation = headers['op']
-        log.info('Policy Interceptor: Authorization request for service [%s] operation [%s] user_id [%s] expiry [%s]' % (service, operation, user_id, expiry))
+        log.info('Policy Interceptor: Policy request for service [%s] operation [%s] user_id [%s] expiry [%s]' % (service, operation, user_id, expiry))
 
         if service in policy_dictionary:
             service_list = policy_dictionary[service]

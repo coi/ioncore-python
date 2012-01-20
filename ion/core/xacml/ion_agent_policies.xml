@@ -78,7 +78,8 @@
                 </Apply>
             </Apply>
         </Condition-->
-        <Condition>
+        <!---Condition>
+            
             <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
                <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
                    <SubjectAttributeDesignator
@@ -87,16 +88,16 @@
                </Apply>
                <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">IPC420</AttributeValue>
             </Apply>
-        </Condition>
-        <!--Condition>
+        </Condition-->
+        <Condition>
             <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
                     <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
                         <SubjectAttributeDesignator
-                         AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id-qualifier"
+                         AttributeId="urn:oasis:names:tc:xacml:1.0:subject:subject-id"
                          DataType="http://www.w3.org/2001/XMLSchema#string"/>
                     </Apply>
-                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">ooi</AttributeValue>
+                    <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">mmeisinger</AttributeValue>
             </Apply>
-        </Condition-->
+        </Condition>
     </Rule>
 </Policy>

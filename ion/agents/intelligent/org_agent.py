@@ -17,9 +17,8 @@ from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.intercept.governance_support import GovernanceSupport
 
-OP='op'
-DROP='drop'
 AGENT_NAME='org_agent'
+
 class OrgAgentService(ServiceProcess):
     """
     Example service interface
@@ -36,21 +35,20 @@ class OrgAgentService(ServiceProcess):
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
-        self.governance_support = GovernanceSupport()
-        pass
+        self.governance_support = GovernanceSupport(AGENT_NAME)
     
         
 
     @defer.inlineCallbacks
     def op_enroll(self, content, headers, msg):
         log.info('enrolling '+headers['user-id'] + ' in org '+headers['receiver-name'])
-        self.store('enrolled',[headers['user-id'],headers['receiver-name']])
+        self.store('belief',['enrolled', headers['user-id'], content['role'], headers['receiver-name']])
         yield self.reply_ok(msg, {'token':'IPC420'}, {})
 
     @defer.inlineCallbacks
     def op_contribute(self, content, headers, msg):
         log.info(headers['user-id']+' contributing '+str(content['resource_id'])+', action '+ str(content['action'])+ ' to org '+headers['receiver-name'])
-        self.store('contributed',[headers['user-id'],content['resource_id'],content['action'],headers['receiver-name']])
+        self.store('belief',['contributed',headers['user-id'],content['resource_id'],content['action'],headers['receiver-name']])
         yield self.reply_ok(msg, 'success', {})
 
     @defer.inlineCallbacks
@@ -67,10 +65,10 @@ class OrgAgentService(ServiceProcess):
     def op_list_users(self, content, headers, msg):
         org=headers['receiver-name']
         log.info('listing users in ' + org)
-        vars=self.governance_support.list(AGENT_NAME+'_facts','enrolled','($user,'+org+')')
+        vars=self.governance_support.list(AGENT_NAME+'_facts','enrolled','($user,$role,'+org+')')
         response=[]
         for var in vars:
-            response.append(var['user'])
+            response.append([var['user'],var['role']])
         yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
@@ -116,7 +114,7 @@ class OrgAgentServiceClient(ServiceClient):
     @defer.inlineCallbacks
     def request(self, op, headers=None):
          yield self._check_init()
-         log.info('here headers '+ str(headers) + ' op '+op)
+         log.info('request headers '+ str(headers))
          (content, headers, msg) = yield self.rpc_send(op,headers['content'],headers)
          defer.returnValue(str(content))
 

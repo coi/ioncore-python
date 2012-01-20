@@ -21,7 +21,7 @@ class GovernanceInterceptor(EnvelopeInterceptor):
     def before(self, invocation):
         if hasattr(invocation.process,'governance_support'):
             log.debug('Governance Interceptor invoked')
-            response=invocation.process.governance_support.checks(invocation.content)
+            response=invocation.process.governance_support.communicator(invocation.content)
             log.debug('Governance Interceptor received '+str(response))
             if response=='drop':
                 invocation.drop(note=response, code=Invocation.CODE_BAD_REQUEST)

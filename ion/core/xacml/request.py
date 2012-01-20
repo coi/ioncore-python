@@ -32,12 +32,13 @@ THIS_DIR = path.dirname(__file__)
 XACML_ION_POLICY_FILENAME='ion_agent_policies.xml'
 XACML_POLICY_FILEPATH=path.join(THIS_DIR, XACML_ION_POLICY_FILENAME)
 
-TOKEN_ATTRIBUTE_ID="urn:oasis:names:tc:xacml:1.0:ooici:token"
+NEGOTIATED_TIME_ATTRIBUTE_ID="urn:oasis:names:tc:xacml:1.0:ooici:negotiated-start-time"
 ROLE_ATTRIBUTE_ID='urn:oasis:names:tc:xacml:1.0:ooici:subject-id-role'
 #"""XACML DATATYPES"""
 attributeValueFactory = AttributeValueClassFactory()
 AnyUriAttributeValue = attributeValueFactory(AttributeValue.ANY_TYPE_URI)
 StringAttributeValue = attributeValueFactory(AttributeValue.STRING_TYPE_URI)
+TimeAttributeValue = attributeValueFactory(AttributeValue.TIME_TYPE_URI)
 
 AGENT_NAME='org_agent'
 
@@ -91,21 +92,6 @@ def _createRequestCtx(invocation):
     subjectQualifierAttribute.attributeValues[-1].value = org
     log.debug('added data and type to subject qualifier attribute')
 
-        # create token attribute and populate it with appropriate data
-    token=''
-    if 'content' in headers:
-        if 'token' in headers['content']:
-            token=headers['content']['token']
-            log.info('token is '+token)
-
-    subjectTokenAttribute = Attribute()
-    log.debug('empty token attribute created')
-    subjectTokenAttribute.attributeId = TOKEN_ATTRIBUTE_ID
-    subjectTokenAttribute.dataType = StringAttributeValue.IDENTIFIER
-    subjectTokenAttribute.attributeValues.append(StringAttributeValue())
-    subjectTokenAttribute.attributeValues[-1].value = token
-    log.debug('added data and type to subject token attribute')
-
 
 
 
@@ -121,7 +107,6 @@ def _createRequestCtx(invocation):
         # add attributes to the subject element
     subject.attributes.append(subjectIdAttribute)
     subject.attributes.append(subjectQualifierAttribute)
-    subject.attributes.append(subjectTokenAttribute)
     subject.attributes.append(roleAttribute)
 
         # add the subject element to the request
@@ -137,21 +122,27 @@ def _createRequestCtx(invocation):
     resourceAttribute.attributeValues[-1].value = resource_id
     # add attributes to the resource element
     resource.attributes.append(resourceAttribute)
+
+
+   # create negotiated time attribute and populate it with appropriate data
+    negotiated_time='00:00:00.00'
+    if 'content' in headers:
+        if 'negotiated-start-time' in headers['content']:
+            negotiated_time=headers['content']['negotiated-start-time']
+            log.info('token is '+negotiated_time)
+            resourceStartTimeAttribute = Attribute()
+            log.debug('empty token attribute created')
+            resourceStartTimeAttribute.attributeId = NEGOTIATED_TIME_ATTRIBUTE_ID
+            resourceStartTimeAttribute.dataType = StringAttributeValue.IDENTIFIER
+            resourceStartTimeAttribute.attributeValues.append(StringAttributeValue())
+            resourceStartTimeAttribute.attributeValues[-1].value = negotiated_time
+            log.debug('added data and type to subject token attribute')
+            # add attributes to the resource element
+            resource.attributes.append(resourceStartTimeAttribute)
+
     # add the resource element to the request
     request.resources.append(resource)
 
-    # create the resource element
-    #resource = Resource()
-    # create the resource attribute
-    #resourceAttribute = Attribute()
-    #resourceAttribute.attributeId = SERVICE_PROVIDER_ATTRIBUTE
-    #resourceAttribute.dataType = StringAttributeValue.IDENTIFIER
-    #resourceAttribute.attributeValues.append(StringAttributeValue())
-    #resourceAttribute.attributeValues[-1].value = resource_service_id
-    # add attributes to the resource element
-    #resource.attributes.append(resourceAttribute)
-    # add the resource element to the request
-    #request.resources.append(resource)
 
 
     # create the action element

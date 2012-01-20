@@ -12,9 +12,11 @@ from twisted.internet import defer
 
 from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.agents.intelligent.kb import policy_support
-
+from ion.core.intercept.governance_support import GovernanceSupport
+import random
 AGENT_NAME='resource_agent'
+DROP='drop'
+
 class ResourceAgentService(ServiceProcess):
     """
     Example service interface
@@ -30,11 +32,71 @@ class ResourceAgentService(ServiceProcess):
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
-        pass
+        self.governance_support = GovernanceSupport(AGENT_NAME)
+        
+    @defer.inlineCallbacks
+    def op_negotiate_resource(self,content,headers,msg):
+        response=self.normative_filter(content,headers,msg)
+        yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
     def op_get_temp(self, content, headers, msg):
-        yield self.reply_ok(msg, 'temperature on '+headers['receiver-name']+ ' is 13 degrees fahrenheit', {})
+        response=self.normative_filter(content,headers,msg)
+        yield self.reply_ok(msg, response, {})
+
+    def normative_filter(self, content, headers, msg):
+        #check the normative filter for obligation
+        log.info('applying normative filter')
+        try:
+            #consequent= yield self.governance_support.normative_filter(headers)
+            consequent= self.governance_support.normative_filter(headers)
+            #consequent example: (norm,(commitment,(COM3,(request,get_temp,shenrie,glider55),get_temp)))
+            #commitment example: norm(commitment, COM1, glider55, shenrie, antecedent, consequent)
+            log.debug('consequent in NF is '+str(consequent))
+            if len(consequent)==2:
+                op,parameters=consequent
+            else:
+                op=consequent
+                parameters=None
+
+            response=getattr(self, op)(content, headers, msg, parameters)
+        except Exception as exception:
+                log.debug(exception)
+                response={'resource_id':headers['receiver-name'],'consequent':None}
+                log.info('##### NO COMMITMENT')
+
+        #yield self.reply_ok(msg, response, {})
+        return response
+
+    def norm(self,content,headers,msg,parameters):
+
+        #parameters example: (commitment,COM3,(request,get_temp,shenrie,glider55),get_temp)
+        # norm example: norm('commitment', 'COM3', 'glider55', 'shenrie', ('request', 'get_temp', 'shenrie', 'glider55'), 'get_temp')
+        norm_type,id,antecedent,consequent=parameters
+        debtor=headers['receiver-name']
+        creditor=headers['user-id']
+        response={'resource_id':debtor,'consequent':None}
+        try:
+            norm=[norm_type,id, debtor, creditor,antecedent,consequent]
+            self.store('norm',norm)
+            response={'resource_id':debtor,'event':'norm','consequent':norm}
+        except Exception as exception:
+            log.debug(exception)
+            log.error('SEVERE ERROR; Failed to create norm as indicated by consequent')
+        return response
+
+
+    def get_temp(self, content, headers, msg, temperature):
+        response= {'resource_id':headers['receiver-name'],'event':'get_temp','consequent':['temperature on '+headers['receiver-name']+ ' is 8 degree fahrenheit']}
+        log.debug('returning ' +str(response))
+        #self.store('get_temp',[temperature])
+        return response
+
+
+
+    def store(self,fact_name,arguments):
+        self.governance_support.store(AGENT_NAME+'_facts',fact_name,arguments)
+
 
 class ResourceAgentServiceClient(ServiceClient):
     """
@@ -51,7 +113,7 @@ class ResourceAgentServiceClient(ServiceClient):
     def request(self, op, headers=None):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send(op,headers['content'],headers)
-        defer.returnValue(str(content))
+        defer.returnValue(content)
     
     def request_deferred(self, text='Hi there requester'):
         return self.rpc_send('execute_request', text)

@@ -5,16 +5,55 @@
 ##
 ##COMMITMENT
 ##
-detached_commitment
-	use detached_commitment($debtor,$creditor,$antecedent,$consequent)
+# it is a violated commitment if antecedent is satisfied but consequent is not
+violated_commitment
+	use violated_commitment($id, $debtor,$creditor,$antecedent,$consequent)
 	when
-	    org_agent_facts.commitment($debtor,$creditor,$antecedent,$consequent)
+	    org_agent_facts.norm('commitment', $id, $debtor,$creditor,$antecedent,$consequent)
 	    condition($antecedent)
-	    #org_agent_facts.stative(created,$debtor, $creditor, $antecedent, $consequent)
+	    notany
+	        org_agent_facts.belief(stative, $id, commitment, cancelled)
+	        condition($consequent)
+
+# it is a satisified commitment if consequent is satisified
+satisfied_commitment
+	use satisfied_commitment($id, $debtor,$creditor,$antecedent,$consequent)
+	when
+	    org_agent_facts.norm('commitment', $id, $debtor,$creditor,$antecedent,$consequent)
+	    condition($consequent)
+#
+##POWER
+power
+    use power($debtor, $creditor, $antecedent, $consequent)
+    when
+        org_agent_facts.power($debtor,$creditor,$antecedent,$consequent)
+
+power_dontcare
+    use power($debtor, $creditor, $antecedent, $consequent)
+    when
+        org_agent_facts.power($debtor,DONTCARE,$antecedent,$consequent)
+#
+##AUTHORIZATION
+authorization
+    use authorization($id, $debtor, $creditor, $antecedent, $consequent)
+    when
+        org_agent_facts.norm('authorization',$id, $debtor,$creditor,$antecedent,$consequent)
+
+authorization_dontcare
+    use authorization($id, $debtor, $creditor, $antecedent, $consequent)
+    when
+        org_agent_facts.norm(authorization,$id,$debtor,DONTCARE,$antecedent,$consequent)
+
+norm
+    use norm($norm, $id, $debtor, $creditor, $antecedent, $consequent)
+    when
+        org_agent_facts.norm($norm,$id,$debtor,$creditor,$antecedent,$consequent)
+
+
 
 #we expect formula to be generated from the following production rule
 # $event -> some_event
-# $stative -> (state,agent,agent,$formula,$formula)
+# $stative -> ($id, norm, state)
 # $agent -> some_user_id
 # $formula -> $event|$stative|($formula)|($formula,OR,$formula)| ($formula,AND,$formula)
 #
@@ -22,8 +61,8 @@ detached_commitment
 #
 # examples:
 #	(a)
-#	(a, AND, b)
-#	(a, OR, b)
+#	(a, AND, b), ((a, AND, b))
+#	(a, OR, b), ((a, OR, b))
 #   (((a, AND, b), OR, (c, AND, d)), OR,((e, AND, f), OR, (g, OR, h)))
 #	(a, AND, (b,AND,(c,OR,(d,AND,e))))
 #	((b,AND,c),OR,(a,AND,d))
@@ -155,23 +194,3 @@ or_condition_base_parenthetical_b
 ##
 
 
-#POWER
-power
-    use power($debtor, $creditor, $antecedent, $consequent)
-    when
-        org_agent_facts.power($debtor,$creditor,$antecedent,$consequent)
-
-power_dontcare
-    use power($debtor, $creditor, $antecedent, $consequent)
-    when
-        org_agent_facts.power($debtor,DONTCARE,$antecedent,$consequent)
-
-authorization
-    use authorization($debtor, $creditor, $antecedent, $consequent)
-    when
-        org_agent_facts.authorization($debtor,$creditor,$antecedent,$consequent)
-
-authorization_dontcare
-    use authorization($debtor, $creditor, $antecedent, $consequent)
-    when
-        org_agent_facts.authorization($debtor,DONTCARE,$antecedent,$consequent)

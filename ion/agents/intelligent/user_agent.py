@@ -17,6 +17,7 @@ from ion.core.process.process import ProcessFactory
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.agents.intelligent.resource_agent import ResourceAgentServiceClient
 from ion.agents.intelligent.org_agent import OrgAgentServiceClient
+from ion.core.intercept.governance_support import GovernanceSupport
 
 AGENT_NAME='user_agent'
 
@@ -35,18 +36,21 @@ class UserAgentService(ServiceProcess):
 
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
-        pass
-    
+        self.governance_support = GovernanceSupport(AGENT_NAME)
+
     @defer.inlineCallbacks
     def op_resource_request(self, content, headers, msg):
         op=content['action']
+        #header for the user agent 
         headers={'receiver-name':content['resource_id'], 'op':op, 'content':content['content'], 'user-id':headers['user-id']}
-
         rasc = ResourceAgentServiceClient()
         response = yield rasc.request(op,headers)
-        if response is None:
+        log.debug(str(response))
+        if response is None or response['consequent'] is None:
             response = 'failure'
             log.info('No response received from the resource agent')
+        elif response['event'] is not None:
+            self.store(response['event'],response['consequent'])
         yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
@@ -60,6 +64,10 @@ class UserAgentService(ServiceProcess):
             response = 'failure'
             log.info('No response received from the org agent')
         yield self.reply_ok(msg, response, {})
+
+    def store(self,fact_name,arguments):
+        self.governance_support.store(AGENT_NAME+'_facts',fact_name,arguments)
+
 
 
 class UserAgentServiceClient(ServiceClient):

@@ -39,19 +39,21 @@ class UserOne(ServiceProcess):
     @defer.inlineCallbacks
     def send_request(self, user_id='shenrie', resource_id='glider56', action='get_temp',op='resource_request',content={}):
         uasc = UserAgentServiceClient(proc=self)
+        #header for the user agent
         headers={'user-id':user_id, 'content' : {'resource_id':resource_id,'action':action, 'content':content}, 'receiver-name':user_id}
         response  = yield uasc.request(op, headers)
         log.info('response: '+str(response))
-        print
 
-    def request_resource(self, token='IPC420', user_id='shenrie', resource_id='glider55', action='get_temp', op='resource_request'):
+    def request_resource(self, negotiated_time='00:00:00.000-08:00', user_id='shenrie', resource_id='glider55', action='get_temp', op='resource_request'):
         log.info('authorized user requests '+ action +' on '+resource_id)
-        self.send_request(user_id, resource_id, action, op, {'token':token})
-
-
-    def enroll(self, user_id='shenrie', resource_id = 'SCILAB', action='enroll', op='org_request'):
-        log.info('user requests enroll')
         self.send_request(user_id, resource_id, action, op)
+
+    def negotiate_resource(self, user_id='shenrie', resource_id='glider55', duration=5, action='negotiate_resource', op='resource_request'):
+         log.info('authorized user does '+ action +' on '+resource_id+ ' for a duration of '+str(duration)+' hrs')
+         self.send_request(user_id, resource_id, action, op, {'duration':duration})
+
+    def enroll(self, user_id='shenrie', resource_id = 'SCILAB', action='enroll', role='student', op='org_request'):
+        self.send_request(user_id, resource_id, action, op, {'role':role})
 
     def list_resources(self, resource_id = 'SCILAB', user_id='shenrie', action='list_resources', op='org_request'):
         log.info('user requests list of resources from ' + resource_id)
