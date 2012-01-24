@@ -1,0 +1,281 @@
+# $Id: resourceagent.krb 2011-12-06 pckediya $
+#
+#
+#
+##
+##COMMITMENT
+##
+#
+
+# it is a pending norm if antecedent is satisfied but consequent is not
+pending_norm
+	use pending_norm($norm_type, $id, $debtor,$creditor,$antecedent,$consequent)
+	when
+	    python print 'pending_norm'
+	    resource_agent_facts.norm($norm_type, $id, $debtor,$creditor,$antecedent,$consequent)
+	    python print 'checking pending_norm ',$norm_type, $id, $debtor, $creditor, $antecedent, $consequent
+	    condition($antecedent)
+	    notany
+	        python print 'checking notany consequent is true ',$consequent
+	        condition($consequent)
+	        python print 'notany consequent is true ',$consequent
+	        
+# it is a satisified commitment if consequent is satisified
+satisfied_commitment
+	use satisfied_commitment($id)
+	when
+	    resource_agent_facts.norm(commitment, $id, $debtor,$creditor,$antecedent,$consequent)
+	    condition($consequent)
+
+# it is a violated commitment if antecedent is satisfied but consequent is not
+violated_commitment_short_form
+	use violated_commitment($id)
+	when
+	    python print 'checking violated commitment short form ',$id
+	    detached_commitment($id, $creditor,$debtor,$antecedent,$consequent)
+
+# it is a violated commitment if antecedent is satisfied but consequent is not
+violated_commitment
+	use violated_commitment($id, $debtor,$creditor,$antecedent,$consequent)
+	when
+	    python print 'violated commitment long form'
+	    detached_commitment($id, $creditor,$debtor,$antecedent,$consequent)
+
+
+# it is a pending commitment if antecedent is satisfied but consequent is not and
+# we are looking at it from the perspective of the debtor
+detached_commitment
+	use detached_commitment($id, $debtor,$creditor,$antecedent,$consequent)
+	when
+	    python print 'checking detached commitment '
+	    pending_norm(commitment, $id, $debtor,$creditor,$antecedent,$consequent)
+
+# it is a pending sanction if antecedent is satisfied but consequent is not
+pending_sanction
+	use pending_sanction($id, $debtor,$creditor,$antecedent,$consequent)
+	when
+	    pending_norm(sanction, $id, $debtor,$creditor,$antecedent,$consequent)
+
+
+
+
+
+#
+##POWER
+power
+    use power($debtor, $creditor, $antecedent, $consequent)
+    when
+        resource_agent_facts.power($debtor,$creditor,$antecedent,$consequent)
+
+power_dontcare
+    use power($debtor, $creditor, $antecedent, $consequent)
+    when
+        resource_agent_facts.power($debtor,DONTCARE,$antecedent,$consequent)
+#
+##AUTHORIZATION
+authorization
+    use authorization($id, $debtor, $creditor, $antecedent, $consequent)
+    when
+        resource_agent_facts.norm('authorization',$id, $debtor,$creditor,$antecedent,$consequent)
+
+authorization_dontcare
+    use authorization($id, $debtor, $creditor, $antecedent, $consequent)
+    when
+        resource_agent_facts.norm(authorization,$id,$debtor,DONTCARE,$antecedent,$consequent)
+
+norm
+    use norm($norm, $id, $debtor, $creditor, $antecedent, $consequent)
+    when
+        resource_agent_facts.norm($norm,$id,$debtor,$creditor,$antecedent,$consequent)
+
+
+
+#we expect formula to be generated from the following production rule
+# $event -> some_event
+# $stative -> ($id, norm, state)
+# $agent -> some_user_id
+# $formula -> $event|$stative|($formula)|($formula,OR,$formula)| ($formula,AND,$formula)
+#
+# some_event and some_user_id are string literals, example pay and jsmith
+#
+# examples:
+#	(a)
+#	(a, AND, b), ((a, AND, b))
+#	(a, OR, b), ((a, OR, b))
+#   (((a, AND, b), OR, (c, AND, d)), OR,((e, AND, f), OR, (g, OR, h)))
+#	(a, AND, (b,AND,(c,OR,(d,AND,e))))
+#	((b,AND,c),OR,(a,AND,d))
+##
+##SERVICE_INSTANCES
+##
+##
+serviceinstances
+	use service_instances($i)
+	when
+		$i in range(2,10)
+		notany
+			resource_agent_facts.service_instances($i)
+##CONDITIONS
+##
+####
+####EVENT
+####
+
+condition_event
+	use condition($a)
+	when
+	    python print 'condition event', $a
+	    resource_agent_facts.event($a)
+
+condition_parenthetical_event
+	use condition(($a))
+	when
+	    python print 'condition parenthetical event', $a
+	    resource_agent_facts.event($a)
+
+condition_stative
+	use condition($a)
+	when
+	    python print 'condition statives', $a
+	    check len($a) == 5
+	    python 'check stative length',$a,len($a)
+	    python state,debtor,creditor,antecedent,consequent=$a
+	    $state=state
+	    $debtor=debtor
+	    $creditor=creditor
+	    $antecedent=antecedent
+	    $consequent=consequent
+	    resource_agent_facts.stative($state,$debtor,$creditor,$antecedent,$consequent)
+
+#example value of $a: ('request', 'get_temp', 'shenrie', 'glider55')
+#request example in knowledge_base request('negotiate_resource', 'shenrie', 'glider55', {'duration': 5})
+condition_request
+	use condition($a)
+	when
+	    python print 'check request length',$a,len($a)
+	    check len($a) == 4
+	    python 'check req length',$a,len($a)
+	    python request,request_type,requester,servicer=$a
+	    $request=request
+	    $request_type=request_type
+	    $requester=requester
+	    $servicer=servicer
+	    #$parameter=parameter
+	    resource_agent_facts.$request($request_type,$requester,$servicer,$parameter)
+
+#example value of $a: ('request', ('escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
+#example value in knowledge base: make_request.('escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
+predicate_exists
+    use condition($a)
+    when
+        python print 'check predicate length',$a,len($a)
+        check len($a) == 4
+        python predicate,op,servicer,requester,arguments=$a
+        $predicate=predicate
+        #$data=data
+        #python op,servicer,requester,arguments=$data
+        $op=op
+        $servicer=servicer
+        $requester=requester
+        $arguments=arguments
+        resource_agent_facts.$predicate($op,$servicer,$requester,$arguments)
+
+condition_norm_state
+	use condition($a)
+	when
+	    python print 'check norm state',$a,len($a)
+	    check len($a) == 2
+	    python state,norm_id=$a
+	    $state=state
+	    $norm_id=norm_id
+	    python print 'checking state ',$state,$norm_id
+	    $state($norm_id)
+
+
+#condition_service
+#	use condition($a)
+#	when
+#	    check len($a) == 2
+#	    python service_type,parameters=$a
+#	    $service_type=service_type
+#	    $parameters=parameters
+#	    python requester,servicer,parameter=$parameters
+#	    $requester=requester
+#	    $servicer=servicer
+#	    $parameter=parameter
+#	    resource_agent_facts.$service_type($requester,$servicer,$parameter)
+
+#consequent example: (norm,(commitment,COM3,(request,get_temp,shenrie,glider55),get_temp)))
+#norm example: norm(commitment, COM1, glider55, shenrie, antecedent, consequent)
+condition_norm
+    use condition($a)
+    when
+        python print 'checking condition norm ', $a
+        check len($a)==2
+        python norm,parameter=$a
+        $norm=norm
+        $parameter=parameter
+        python norm_type,id,antecedent,consequent=$parameter
+        $norm_type=norm_type
+        $id=id
+        python print 'checking norm',$norm_type,$id
+        resource_agent_facts.norm($norm_type,$id,$_debtor,$_creditor,$_antecedent,$_consequent)
+
+
+
+
+##
+##
+####
+####AND CONDITIONS
+####
+######
+######AND CONDITIONS BASE CASE
+######
+and_condition_event_base_case
+	use condition($a,AND,$b)
+	when
+		condition($a)
+		condition($b)
+and_condition_event_parenthetical_base_case
+	use condition(($a,AND,$b))
+	when
+		condition($a)
+		condition($b)
+####
+####AND CONDITIONS
+####
+##
+##
+####
+####OR CONDITIONS
+####
+######
+######OR CONDITIONS BASE CASE
+######
+or_condition_event_base_a
+	use condition($a,OR,$b)
+	when
+		condition($a)
+or_condition_event_base_b
+	use condition($a,OR,$b)
+	when
+		condition($b)
+or_condition_base_parenthetical_a
+	use condition(($a,OR,$b))
+	when
+		condition($a)
+or_condition_base_parenthetical_b
+	use condition(($a,OR,$b))
+	when
+		condition($b)
+
+####
+####OR CONDITIONS
+####
+##
+##CONDITIONS
+##
+
+
+

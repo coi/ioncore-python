@@ -1,0 +1,68 @@
+# $Id: resourceagent.kfb 2011-12-06 pckediya $
+# coding=utf-8
+
+# orgagent.service_instances
+#service_instances(1)
+#orgagent_facts.commitment($debtor,$creditor,$antecedent,$consequent)
+#commitment(self, ooi, ooi_role($ionUserID,student), enroll($ionUserID, SCILAB,student))
+#commitment(self, ooi, ooi_role($ionUserID,researcher), (enroll, ($ionUserID, SCILAB,contributer)))
+#predicate(enroll, (ionUserID, SCILAB,contributer))
+#mpsingh is enrolled in SCILAB
+#enrolled(mpsingh,SCLIAB)
+#alice contributes glider55 with capability get_temp to CHUSLAB
+#contributed(alice, glider55,get_temp, CHUSLAB)
+#commitment(SCILAB, ooi, '', ('predicate', 'enroll', ('ionUserID', 'SCILAB', 'student')))
+#commitment(anl, bob, a, "enroll('bob', 'contributer', 'anl')")
+#stative(COM2, commitment, cancelled)
+#commitment((anl, bob, a, g))
+#commitment(anl)
+#orgagent_facts.event($event)
+#event(a)
+#event(b)
+#event(c)
+#event(d)
+#stative(created, anl, bob, b, g)
+#stative(created, anl, bob, (created, anl, bob, x, y), z)
+#stative((created, anl, bob, (created, anl, bob, b, g), g))
+#token(IPC420, SCILAB)
+
+#ORG DEFINITION (ORG)
+##norm(power, POW1, SCILAB, DONTCARE, enroll, permit)
+##norm(power, POW2, SCILAB, DONTCARE, list_users, permit)
+##norm(power, POW3, SCILAB, DONTCARE, contribute, permit)
+##norm(power, POW4, glider55, DONTCARE, negotiate_resource, permit)
+##ORG DEFINITION (ORG)
+#norm(authorization, AUTH1, SCILAB, DONTCARE, list_resources, list_resources)
+#norm(authorization, AUTH2, SCILAB, DONTCARE, list_users, list_users)
+#norm(authorization, AUTH3, SCILAB, DONTCARE, validate_token, validate_token)
+#norm(authorization, AUTH4, SCILAB, DONTCARE, validate_enrollment, validate_enrollment)
+#ORG DEFINITION (RESOURCE)
+##norm(power, POW5, glider55, DONTCARE, negotiate_resource, permit)
+
+#ORG DEFINITION (RESOURCE)
+norm(authorization, AUTH5, glider55, DONTCARE, negotiate_resource, permit)
+# the commmitment below causes the resource agent to create a commitment when resource is negotiated
+# for the commitment to be created the resource agent should have a corresponding power and authoriztion
+# (power and auth not yet implemented)
+norm(commitment, COM1, glider55, shenrie, (request,negotiate_resource,shenrie,glider55), (norm,(commitment,COM3,(request,get_temp,shenrie,glider55,()),get_temp)))
+belief(stative, COM2, commitment, cancelled)
+
+#ORG DEFINITION (USER)
+##norm(power, POW6, shenrie,DONTCARE,resource_request,permit)
+##norm(power, POW7, mmeisinger,DONTCARE,resource_request,permit)
+##norm(power, POW8, mmeisinger,DONTCARE,org_request,permit)
+##norm(power, POW9, shenrie,DONTCARE,org_request,permit)
+norm(sanction, SAN1, shenrie, glider55, (violated_commitment,COM3), (make_request,escalate,shenrie,SCILAB,(sanction,SAN1))))
+
+#ORG DEFINITION (USER)
+norm(authorization, AUTH7, mmeisinger,DONTCARE,contribute,permit)
+norm(authorization, AUTH8, shenrie,DONTCARE,enroll,permit)
+norm(authorization, AUTH9, mmeisinger,DONTCARE,enroll,permit)
+norm(authorization, AUTH10, shenrie,DONTCARE,resource_request,permit)
+norm(authorization, AUTH11, mmeisinger,DONTCARE,org_request,permit)
+norm(authorization, AUTH12, shenrie,DONTCARE,org_request,permit)
+norm(authorization, AUTH13, mmeisinger,DONTCARE,resource_request,permit)
+norm(authorization, AUTH14, shenrie, glider55, negotiate_resource, permit)
+norm(authorization, AUTH15, shenrie, glider55, get_temp, permit)
+
+
