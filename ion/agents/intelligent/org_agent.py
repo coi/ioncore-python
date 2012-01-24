@@ -42,14 +42,19 @@ class OrgAgentService(ServiceProcess):
     @defer.inlineCallbacks
     def op_enroll(self, content, headers, msg):
         log.info('enrolling '+headers['user-id'] + ' in org '+headers['receiver-name'])
-        self.store('belief',['enrolled', headers['user-id'], content['role'], headers['receiver-name']])
-        yield self.reply_ok(msg, {'token':'IPC420'}, {})
+        consequent=['enrolled', headers['user-id'], content['role'], headers['receiver-name']]
+        self.store('belief',consequent)
+        response={'belief':'belief','consequent':consequent}
+        yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
     def op_contribute(self, content, headers, msg):
         log.info(headers['user-id']+' contributing '+str(content['resource_id'])+', action '+ str(content['action'])+ ' to org '+headers['receiver-name'])
-        self.store('belief',['contributed',headers['user-id'],content['resource_id'],content['action'],headers['receiver-name']])
-        yield self.reply_ok(msg, 'success', {})
+        consequent=['contributed',headers['user-id'],content['resource_id'],content['action'],headers['receiver-name']]
+        self.store('belief',consequent)
+        response={'belief':'belief','consequent':consequent}
+
+        yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
     def op_list_resources(self, content, headers, msg):
@@ -116,7 +121,7 @@ class OrgAgentServiceClient(ServiceClient):
          yield self._check_init()
          log.info('request headers '+ str(headers))
          (content, headers, msg) = yield self.rpc_send(op,headers['content'],headers)
-         defer.returnValue(str(content))
+         defer.returnValue(content)
 
     
     def request_deferred(self, request=None):

@@ -41,6 +41,7 @@ class ResourceAgentService(ServiceProcess):
 
     @defer.inlineCallbacks
     def op_get_temp(self, content, headers, msg):
+        log.debug('i was called')
         response=self.normative_filter(content,headers,msg)
         yield self.reply_ok(msg, response, {})
 
@@ -49,8 +50,8 @@ class ResourceAgentService(ServiceProcess):
         log.info('applying normative filter')
         try:
             #consequent= yield self.governance_support.normative_filter(headers)
-            consequent= self.governance_support.normative_filter(headers)
-            #consequent example: (norm,(commitment,(COM3,(request,get_temp,shenrie,glider55),get_temp)))
+            consequent= self.governance_support.check_detached_commitments(headers)
+            #consequent example: (norm,(commitment,(COM3,(request,(get_temp,()),shenrie,glider55),(get_temp,()))))
             #commitment example: norm(commitment, COM1, glider55, shenrie, antecedent, consequent)
             log.debug('consequent in NF is '+str(consequent))
             if len(consequent)==2:
@@ -79,7 +80,7 @@ class ResourceAgentService(ServiceProcess):
         try:
             norm=[norm_type,id, debtor, creditor,antecedent,consequent]
             self.store('norm',norm)
-            response={'resource_id':debtor,'event':'norm','consequent':norm}
+            response={'resource_id':debtor,'belief':'norm','consequent':norm}
         except Exception as exception:
             log.debug(exception)
             log.error('SEVERE ERROR; Failed to create norm as indicated by consequent')
@@ -87,7 +88,7 @@ class ResourceAgentService(ServiceProcess):
 
 
     def get_temp(self, content, headers, msg, temperature):
-        response= {'resource_id':headers['receiver-name'],'event':'get_temp','consequent':['temperature on '+headers['receiver-name']+ ' is 8 degree fahrenheit']}
+        response= {'resource_id':headers['receiver-name'],'belief':'get_temp','consequent':['temperature on '+headers['receiver-name']+ ' is 8 degree fahrenheit']}
         log.debug('returning ' +str(response))
         #self.store('get_temp',[temperature])
         return response
@@ -114,7 +115,8 @@ class ResourceAgentServiceClient(ServiceClient):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send(op,headers['content'],headers)
         defer.returnValue(content)
-    
+
+
     def request_deferred(self, text='Hi there requester'):
         return self.rpc_send('execute_request', text)
 

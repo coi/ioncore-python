@@ -5,21 +5,42 @@
 ##
 ##COMMITMENT
 ##
+
 # it is a violated commitment if antecedent is satisfied but consequent is not
 violated_commitment
 	use violated_commitment($id, $debtor,$creditor,$antecedent,$consequent)
 	when
-	    org_agent_facts.norm('commitment', $id, $debtor,$creditor,$antecedent,$consequent)
+	    detached_commitment(commitment, $id, $creditor,$debtor,$antecedent,$consequent)
+
+
+# it is a pending commitment if antecedent is satisfied but consequent is not and
+# we are looking at it from the perspective of the debtor
+detached_commitment
+	use detached_commitment($id, $debtor,$creditor,$antecedent,$consequent)
+	when
+	    pending_norm(commitment, $id, $debtor,$creditor,$antecedent,$consequent)
+
+# it is a pending sanction if antecedent is satisfied but consequent is not
+pending_sanction
+	use pending_sanction($id, $debtor,$creditor,$antecedent,$consequent)
+	when
+	    pending_norm(sanction, $id, $debtor,$creditor,$antecedent,$consequent)
+
+# it is a pending norm if antecedent is satisfied but consequent is not
+pending_norm
+	use pending_norm($norm_type, $id, $debtor,$creditor,$antecedent,$consequent)
+	when
+	    org_agent_facts.norm($norm_type, $id, $debtor,$creditor,$antecedent,$consequent)
+	    python print 'checking consequent',$consequent
 	    condition($antecedent)
 	    notany
-	        org_agent_facts.belief(stative, $id, commitment, cancelled)
 	        condition($consequent)
 
 # it is a satisified commitment if consequent is satisified
 satisfied_commitment
 	use satisfied_commitment($id, $debtor,$creditor,$antecedent,$consequent)
 	when
-	    org_agent_facts.norm('commitment', $id, $debtor,$creditor,$antecedent,$consequent)
+	    org_agent_facts.norm(commitment, $id, $debtor,$creditor,$antecedent,$consequent)
 	    condition($consequent)
 #
 ##POWER
@@ -85,17 +106,21 @@ serviceinstances
 condition_event
 	use condition($a)
 	when
-		org_agent_facts.event($a)
+	    python print 'condition event', $a
+	    org_agent_facts.event($a)
 
 condition_parenthetical_event
 	use condition(($a))
 	when
-		org_agent_facts.event($a)
+	    python print 'condition parenthetical event', $a
+	    org_agent_facts.event($a)
 
-condition_commitment
+condition_stative
 	use condition($a)
 	when
+	    python print 'condition statives', $a
 	    check len($a) == 5
+	    python 'check stative length',$a,len($a)
 	    python state,debtor,creditor,antecedent,consequent=$a
 	    $state=state
 	    $debtor=debtor
@@ -104,23 +129,72 @@ condition_commitment
 	    $consequent=consequent
 	    org_agent_facts.stative($state,$debtor,$creditor,$antecedent,$consequent)
 
+#consequent example:
+#request example request('negotiate_resource', 'shenrie', 'glider55', {'duration': 5})
+
+condition_request
+	use condition($a)
+	when
+	    python print 'check req length',$a,len($a)
+	    check len($a) == 4
+	    python 'check req length',$a,len($a)
+	    python request,request_type,requester,servicer=$a
+	    $request=request
+	    $request_type=request_type
+	    $requester=requester
+	    $servicer=servicer
+	    org_agent_facts.request($request_type,$requester,$servicer,$parameter)
+
+#condition_service
+#	use condition($a)
+#	when
+#	    check len($a) == 2
+#	    python service_type,parameters=$a
+#	    $service_type=service_type
+#	    $parameters=parameters
+#	    python requester,servicer,parameter=$parameters
+#	    $requester=requester
+#	    $servicer=servicer
+#	    $parameter=parameter
+#	    org_agent_facts.$service_type($requester,$servicer,$parameter)
+
+#consequent example: (norm,(commitment,COM3,(request,get_temp,shenrie,glider55),get_temp)))
+#norm example: norm(commitment, COM1, glider55, shenrie, antecedent, consequent)
+condition_norm
+    use condition($a)
+    when
+        check len($a)==2
+        python norm,parameter=$a
+        $norm=norm
+        $parameter=parameter
+        python norm_type,id,antecedent,consequent=$parameter
+        $norm_type=norm_type
+        $id=id
+        python print 'checking norm',$norm_type,$id
+        org_agent_facts.norm($norm_type,$id,$_debtor,$_creditor,$_antecedent,$_consequent)
+
 
 predicate_condition
 	use condition($antecedent)
 	when
-	    python predicatetype,predicate,parameters=$antecedent
-	    check predicatetype=='predicate'
-	    $predicate=predicate
+	    python print 'check predicate'
+	    check len($antecedent)==3
+	    python predicate,predicate_type,parameters=$antecedent
+	    check predicate=='predicate'
+	    $predicate_type=predicate_type
 	    $parameters=parameters
-	    python print "commitments antecedent", $antecedent, $predicate, $parameters
-	    org_agent_facts.$predicate($parameters)
+	    python print "commitments antecedent", $antecedent, $predicate_type, $parameters
+	    org_agent_facts.$predicate_type($parameters)
 
-condition__predicate
+condition_predicate
 	use pcondition($a)
 	when
+	    python print "h"
 	    org_agent_facts.predicate($b,$c)
 	    python print "h",$c
 	    org_agent_facts.$b($c)
+
+
 test_patterned_event
 	use pevent($a)
 	when
