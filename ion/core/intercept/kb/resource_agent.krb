@@ -163,22 +163,22 @@ condition_request
 	    #$parameter=parameter
 	    resource_agent_facts.$request($request_type,$requester,$servicer,$parameter)
 
-#example value of $a: ('request', ('escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
-#example value in knowledge base: make_request.('escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
+
+#example value of $a: ('escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
+#example value in knowledge base:escalate( 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
 predicate_exists
     use condition($a)
     when
         python print 'check predicate length',$a,len($a)
         check len($a) == 4
-        python predicate,op,servicer,requester,arguments=$a
-        $predicate=predicate
+        python op,servicer,requester,arguments=$a
         #$data=data
         #python op,servicer,requester,arguments=$data
         $op=op
         $servicer=servicer
         $requester=requester
         $arguments=arguments
-        resource_agent_facts.$predicate($op,$servicer,$requester,$arguments)
+        user_agent_facts.$op($servicer,$requester,$arguments)
 
 condition_norm_state
 	use condition($a)

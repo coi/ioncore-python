@@ -42,17 +42,24 @@ class OrgAgentService(ServiceProcess):
     @defer.inlineCallbacks
     def op_enroll(self, content, headers, msg):
         log.info('enrolling '+headers['user-id'] + ' in org '+headers['receiver-name'])
-        consequent=['enrolled', headers['user-id'], content['role'], headers['receiver-name']]
-        self.store('belief',consequent)
-        response={'belief':'belief','consequent':consequent}
+        consequent=[headers['user-id'], content['role'], headers['receiver-name']]
+        response={'belief':'enroll','consequent':consequent}
+        yield self.reply_ok(msg, response, {})
+
+    @defer.inlineCallbacks
+    def op_sanction(self, content, headers, msg):
+
+        op,op_id,sanctioned_user=content
+        consequent=[sanctioned_user, headers['receiver-name']]
+        response={'belief':'eject','consequent':consequent}
+        self.store(response['belief'],response['consequent'])
         yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
     def op_contribute(self, content, headers, msg):
         log.info(headers['user-id']+' contributing '+str(content['resource_id'])+', action '+ str(content['action'])+ ' to org '+headers['receiver-name'])
-        consequent=['contributed',headers['user-id'],content['resource_id'],content['action'],headers['receiver-name']]
-        self.store('belief',consequent)
-        response={'belief':'belief','consequent':consequent}
+        consequent=[headers['user-id'],content['resource_id'],content['action'],headers['receiver-name']]
+        response={'belief':'contribute','consequent':consequent}
 
         yield self.reply_ok(msg, response, {})
 

@@ -39,7 +39,7 @@ class UserTwo(ServiceProcess):
     @defer.inlineCallbacks
     def send_request(self, user_id='mmeisinger', resource_id = 'SCILAB', action='contribute', op='resource_request', content={'resource_id':'glider56','action':'get_temp'}):
         uasc = UserAgentServiceClient(proc=self)
-        headers={'user-id':user_id, 'content' : {'resource_id':resource_id,'action':action, 'content':content}, 'receiver-name':user_id}
+        headers={'user-id':user_id, 'content' : {'receiver-name':resource_id,'op':action, 'content':content}, 'receiver-name':user_id}
         response  = yield uasc.request(op, headers)
         log.info('response: '+str(response))
         print

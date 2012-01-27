@@ -38,88 +38,105 @@ class UserAgentService(ServiceProcess):
         # Service life cycle state. Initialize service here. Can use yields.
         self.governance_support = GovernanceSupport(AGENT_NAME)
 
+
+
+
+    @defer.inlineCallbacks
+    def op_org_request(self, content, headers, msg):
+        op=content['op']
+        headers={'receiver-name':content['receiver-name'], 'op':op, 'content':content['content'], 'user-id':headers['user-id']}
+        self.store(op, [headers['user-id'], content['receiver-name'], str(content['content'])])
+        
+        try:
+            oasc = OrgAgentServiceClient()
+            response = yield oasc.request(op,headers)
+        except Exception as exception:
+            #if org agent does not respond, store the fact
+            response={'belief':'refused','consequent':[op,[headers['user-id'], content['receiver-name'], str(content['content'])]]}
+
+        self.store(response['belief'],response['consequent'])
+        if response['belief']=='eject':
+            yield response
+        else:
+            yield self.reply_ok(msg, response, {})
+
     @defer.inlineCallbacks
     def op_resource_request(self, content, headers, msg):
 
         #generate header for the message to the resource agent
-        op=content['action']
-        headers={'receiver-name':content['resource_id'], 'op':op, 'content':content['content'], 'user-id':headers['user-id']}
-
+        op=content['op']
+        headers={'receiver-name':content['receiver-name'], 'op':op, 'content':content['content'], 'user-id':headers['user-id']}
         #store the fact that you attempted the request
         #belief('request', 'enroll','shenrie', 'SCILAB', {'role':'researcher'})
-        self.store('request', [op,headers['user-id'], content['resource_id'], content['content']])
-
+        self.store(op, [headers['user-id'], content['receiver-name'], str(content['content'])])
         try:
             #make request to the resource agent
             rasc = ResourceAgentServiceClient()
             response = yield rasc.request(op,headers)
-
+            self.store(response['belief'],response['consequent'])
         except Exception as exception:
             #if resource agent does not respond store the fact
-            response={'belief':'belief','consequent':['refused',op]}
+            response={'belief':'refused','consequent':[op,headers['user-id'], content['receiver-name'], str(content['content'])]}
             self.store(response['belief'],response['consequent'])
 
             #check if there is a sanction for an unexpected response
             log.info('No response received from the resource agent, checking for applicable sanctions')
-            consequent=self.normative_filter(content,headers,msg)
-            if len(consequent)==2:
-                op,parameters=consequent
-            else:
-                op=consequent
-                parameters=None
 
-            response=getattr(self, op)(content, headers, msg, parameters)
+            consequent=self.check_pending_sanctions(content,headers,msg)
+               
+            #try:
+            #    if len(consequent)==2:
+            #        op,parameters=consequent
+            #    else:
+            #        op=consequent
+            #        parameters=None
+            #    response=getattr(self, op)(content, headers, msg, parameters)
+            #    if response is not None or response['belief'] is not None:
+            #        self.store(response['belief'],response['consequent'])
+            #except Exception as exception:
+            #    log.error(exception)
+            #    response='Failure'
 
-        if response is not None or response['belief'] is not None:
-            self.store(response['belief'],response['consequent'])
+
+
         yield self.reply_ok(msg, response, {})
 
-    #def escalate(self,content,headers,msg,parameters):
-        
-
-    @defer.inlineCallbacks
-    def op_org_request(self, content, headers, msg):
-        op=content['action']
-        headers={'receiver-name':content['resource_id'], 'op':op, 'content':content['content'], 'user-id':headers['user-id']}
-
-        oasc = OrgAgentServiceClient()
-        response = yield oasc.request(op,headers)
-        if response is None:
-            response = 'failure'
-            log.info('No response received from the org agent')
-            #check if there is a sanction for an unexpected response
-            response=self.normative_filter(content,headers,msg)
-        if response is None or response['consequent'] is None:
-            #response = 'failure'
-            log.info('No response received from the resource agent')
-            #check if there is a sanction for an unexpected response
-            response=self.normative_filter(content,headers,msg)
-        elif response['belief'] is not None:
-            self.store(response['belief'],response['consequent'])
-        yield self.reply_ok(msg, response, {})
-
-    def normative_filter(self, content, headers, msg):
+    def check_pending_sanctions(self, content, headers, msg):
         #check the normative filter for obligation
         log.info('applying normative filter')
         try:
-            #consequent= yield self.governance_support.normative_filter(headers)
+            #consequent example: ('make_request', 'escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1'))
             consequent= self.governance_support.check_pending_sanctions(headers)
-            #consequent example: (norm,(commitment,(COM3,(request,get_temp,shenrie,glider55),get_temp)))
-            #commitment example: norm(commitment, COM1, glider55, shenrie, antecedent, consequent)
             log.debug('consequent in NF is '+str(consequent))
-            if len(consequent)==2:
-                op,parameters=consequent
+
+            if len(consequent)==4:
+                #assumes sanction have consequent that have an operation to be issued by creditor to debtor with parameters
+                op,creditor,debtor,parameters=consequent
+                parameters=[creditor,debtor,parameters]
             else:
+                #consequent has an operation without parameters
                 op=consequent
                 parameters=None
-            #response=getattr(self, op)(content, headers, msg, parameters)
+
+            #perform the operation op
+            response=getattr(self, op)(content, headers, msg, parameters)
+
         except Exception as exception:
                 log.debug(exception)
                 response={'resource_id':headers['receiver-name'],'consequent':None}
-                log.info('##### NO COMMITMENT')
-
-        #yield self.reply_ok(msg, response, {})
+                log.error('##### NO SANCTIONS APPLIED #####')
         return response
+
+    def escalate(self,content,headers,msg,parameters):
+        creditor,debtor,parameters=parameters
+        op=parameters[0]
+
+        #override the content with headers information because op_org_request will inspect
+        #the content and form a header out of it
+        content={'receiver-name':debtor, 'op':op, 'content':parameters, 'user-id':creditor}
+
+        return self.op_org_request(content,headers,msg)
+
 
     def store(self,fact_name,arguments):
         self.governance_support.store(AGENT_NAME+'_facts',fact_name,arguments)

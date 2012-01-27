@@ -1,4 +1,4 @@
-# $Id: resourceagent.krb 2011-12-06 pckediya $
+# $Id: useragent.krb 2011-12-06 pckediya $
 #
 #
 #
@@ -9,22 +9,22 @@
 
 # it is a pending norm if antecedent is satisfied but consequent is not
 pending_norm
-	use pending_norm($norm_type, $id, $debtor,$creditor,$antecedent,$consequent)
+	use pending_norm($norm_type,$id,$debtor,$creditor,$antecedent,$consequent)
 	when
-	    python print 'pending_norm'
+	    python print 'checking pending_norm ',$norm_type
 	    user_agent_facts.norm($norm_type, $id, $debtor,$creditor,$antecedent,$consequent)
-	    python print 'checking pending_norm ',$norm_type, $id, $debtor, $creditor, $antecedent, $consequent
+	    python print 'checking pending_norm ',$norm_type,$id, $debtor,$creditor,$antecedent,$consequent
 	    condition($antecedent)
 	    notany
 	        python print 'checking notany consequent is true ',$consequent
 	        condition($consequent)
 	        python print 'notany consequent is true ',$consequent
-	        
+
 # it is a satisified commitment if consequent is satisified
 satisfied_commitment
 	use satisfied_commitment($id)
 	when
-	    user_agent_facts.norm(commitment, $id, $debtor,$creditor,$antecedent,$consequent)
+	    user_agent_facts.norm(commitment,$id,$debtor,$creditor,$antecedent,$consequent)
 	    condition($consequent)
 
 # it is a violated commitment if antecedent is satisfied but consequent is not
@@ -32,29 +32,30 @@ violated_commitment_short_form
 	use violated_commitment($id)
 	when
 	    python print 'checking violated commitment short form ',$id
-	    detached_commitment($id, $creditor,$debtor,$antecedent,$consequent)
+	    detached_commitment($id,$creditor,$debtor,$antecedent,$consequent)
+	    #pending_norm(commitment,$id,$_creditor,$_debtor,$_antecedent,$_consequent)
 
 # it is a violated commitment if antecedent is satisfied but consequent is not
 violated_commitment
-	use violated_commitment($id, $debtor,$creditor,$antecedent,$consequent)
+	use violated_commitment($id,$debtor,$creditor,$antecedent,$consequent)
 	when
 	    python print 'violated commitment long form'
-	    detached_commitment($id, $creditor,$debtor,$antecedent,$consequent)
+	    detached_commitment($id,$creditor,$debtor,$antecedent,$consequent)
 
 
 # it is a pending commitment if antecedent is satisfied but consequent is not and
 # we are looking at it from the perspective of the debtor
 detached_commitment
-	use detached_commitment($id, $debtor,$creditor,$antecedent,$consequent)
+	use detached_commitment($id,$debtor,$creditor,$antecedent,$consequent)
 	when
-	    python print 'checking detached commitment '
-	    pending_norm(commitment, $id, $debtor,$creditor,$antecedent,$consequent)
+	    python print 'checking detached commitment ',$id
+	    pending_norm(commitment,$id,$debtor,$creditor,$antecedent,$consequent)
 
 # it is a pending sanction if antecedent is satisfied but consequent is not
 pending_sanction
-	use pending_sanction($id, $debtor,$creditor,$antecedent,$consequent)
+	use pending_sanction($id,$debtor,$creditor,$antecedent,$consequent)
 	when
-	    pending_norm(sanction, $id, $debtor,$creditor,$antecedent,$consequent)
+	    pending_norm(sanction,$id,$debtor,$creditor,$antecedent,$consequent)
 
 
 
@@ -163,22 +164,21 @@ condition_request
 	    #$parameter=parameter
 	    user_agent_facts.$request($request_type,$requester,$servicer,$parameter)
 
-#example value of $a: ('request', ('escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
-#example value in knowledge base: make_request.('escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
+#example value of $a: ('escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
+#example value in knowledge base:escalate( 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
 predicate_exists
     use condition($a)
     when
         python print 'check predicate length',$a,len($a)
-        check len($a) == 5
-        python predicate,op,servicer,requester,arguments=$a
-        $predicate=predicate
+        check len($a) == 4
+        python op,servicer,requester,arguments=$a
         #$data=data
         #python op,servicer,requester,arguments=$data
         $op=op
         $servicer=servicer
         $requester=requester
         $arguments=arguments
-        user_agent_facts.$predicate($op,$servicer,$requester,$arguments)
+        user_agent_facts.$op($servicer,$requester,$arguments)
 
 condition_norm_state
 	use condition($a)

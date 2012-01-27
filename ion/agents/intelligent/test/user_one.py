@@ -40,7 +40,7 @@ class UserOne(ServiceProcess):
     def send_request(self, user_id='shenrie', resource_id='glider56', action='get_temp',op='resource_request',content={}):
         uasc = UserAgentServiceClient(proc=self)
         #header for the user agent
-        headers={'user-id':user_id, 'content' : {'resource_id':resource_id,'action':action, 'content':content}, 'receiver-name':user_id}
+        headers={'user-id':user_id, 'content' : {'receiver-name':resource_id,'op':action, 'content':content}, 'receiver-name':user_id}
         response  = yield uasc.request(op, headers)
         log.info('response: '+str(response))
 

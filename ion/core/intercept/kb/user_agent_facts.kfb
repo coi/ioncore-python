@@ -36,6 +36,7 @@
 #norm(authorization, AUTH2, SCILAB, DONTCARE, list_users, list_users)
 #norm(authorization, AUTH3, SCILAB, DONTCARE, validate_token, validate_token)
 #norm(authorization, AUTH4, SCILAB, DONTCARE, validate_enrollment, validate_enrollment)
+
 #ORG DEFINITION (RESOURCE)
 ##norm(power, POW5, glider55, DONTCARE, negotiate_resource, permit)
 
@@ -44,7 +45,10 @@ norm(authorization, AUTH5, glider55, DONTCARE, negotiate_resource, permit)
 # the commmitment below causes the resource agent to create a commitment when resource is negotiated
 # for the commitment to be created the resource agent should have a corresponding power and authoriztion
 # (power and auth not yet implemented)
-norm(commitment, COM1, glider55, shenrie, (request,negotiate_resource,shenrie,glider55), (norm,(commitment,COM3,(request,get_temp,shenrie,glider55,()),get_temp)))
+
+#todo: add parameters to get_temp so that this norm can be checked as a predicate
+#norm(commitment, COM1, glider55, shenrie, (negotiate_resource,shenrie,glider55), (norm,(commitment,COM3,(get_temp,shenrie,glider55,(a,b)),get_temp)))
+norm(commitment, COM1, glider55, shenrie, (negotiate_resource,shenrie,glider55,"{\'duration\': 5}"), (norm,(commitment,COM3,(get_temp,shenrie,glider55,"{}"),get_temp)))
 belief(stative, COM2, commitment, cancelled)
 
 #ORG DEFINITION (USER)
@@ -52,9 +56,10 @@ belief(stative, COM2, commitment, cancelled)
 ##norm(power, POW7, mmeisinger,DONTCARE,resource_request,permit)
 ##norm(power, POW8, mmeisinger,DONTCARE,org_request,permit)
 ##norm(power, POW9, shenrie,DONTCARE,org_request,permit)
-norm(sanction, SAN1, shenrie, glider55, (violated_commitment,COM3), (make_request,escalate,shenrie,SCILAB,(sanction,SAN1))))
+norm(sanction, SAN1, shenrie, glider55, (violated_commitment,COM3), (escalate,shenrie,SCILAB,(sanction,SAN1,mmeisinger)))
 
 #ORG DEFINITION (USER)
+norm(authorization, AUTH6, shenrie, DONTCARE, sanction, permit)
 norm(authorization, AUTH7, mmeisinger,DONTCARE,contribute,permit)
 norm(authorization, AUTH8, shenrie,DONTCARE,enroll,permit)
 norm(authorization, AUTH9, mmeisinger,DONTCARE,enroll,permit)
@@ -64,5 +69,7 @@ norm(authorization, AUTH12, shenrie,DONTCARE,org_request,permit)
 norm(authorization, AUTH13, mmeisinger,DONTCARE,resource_request,permit)
 norm(authorization, AUTH14, shenrie, glider55, negotiate_resource, permit)
 norm(authorization, AUTH15, shenrie, glider55, get_temp, permit)
+
+
 
 

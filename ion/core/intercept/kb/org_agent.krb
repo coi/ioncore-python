@@ -1,16 +1,46 @@
-# $Id: useragent.krb 2011-12-06 pckediya $
+# $Id: orgagent.krb 2011-12-06 pckediya $
 #
 #
 #
 ##
 ##COMMITMENT
 ##
+#
+
+# it is a pending norm if antecedent is satisfied but consequent is not
+pending_norm
+	use pending_norm($norm_type, $id, $debtor,$creditor,$antecedent,$consequent)
+	when
+	    python print 'checking pending_norm ',$norm_type
+	    org_agent_facts.norm($norm_type, $id, $debtor,$creditor,$antecedent,$consequent)
+	    python print 'checking pending_norm condition'
+	    python print 'checking pending_norm condition',$norm_type, $id, $debtor, $creditor, $antecedent, $consequent
+	    condition($antecedent)
+	    notany
+	        python print 'checking notany consequent is true ',$consequent
+	        condition($consequent)
+	        python print 'notany consequent is true ',$consequent
+	        
+# it is a satisified commitment if consequent is satisified
+satisfied_commitment
+	use satisfied_commitment($id)
+	when
+	    org_agent_facts.norm(commitment, $id, $debtor,$creditor,$antecedent,$consequent)
+	    condition($consequent)
+
+# it is a violated commitment if antecedent is satisfied but consequent is not
+violated_commitment_short_form
+	use violated_commitment($id)
+	when
+	    python print 'checking violated commitment short form ',$id
+	    detached_commitment($id, $creditor,$debtor,$antecedent,$consequent)
 
 # it is a violated commitment if antecedent is satisfied but consequent is not
 violated_commitment
 	use violated_commitment($id, $debtor,$creditor,$antecedent,$consequent)
 	when
-	    detached_commitment(commitment, $id, $creditor,$debtor,$antecedent,$consequent)
+	    python print 'violated commitment long form'
+	    detached_commitment($id, $creditor,$debtor,$antecedent,$consequent)
 
 
 # it is a pending commitment if antecedent is satisfied but consequent is not and
@@ -18,6 +48,7 @@ violated_commitment
 detached_commitment
 	use detached_commitment($id, $debtor,$creditor,$antecedent,$consequent)
 	when
+	    python print 'checking detached commitment ',$id
 	    pending_norm(commitment, $id, $debtor,$creditor,$antecedent,$consequent)
 
 # it is a pending sanction if antecedent is satisfied but consequent is not
@@ -26,22 +57,10 @@ pending_sanction
 	when
 	    pending_norm(sanction, $id, $debtor,$creditor,$antecedent,$consequent)
 
-# it is a pending norm if antecedent is satisfied but consequent is not
-pending_norm
-	use pending_norm($norm_type, $id, $debtor,$creditor,$antecedent,$consequent)
-	when
-	    org_agent_facts.norm($norm_type, $id, $debtor,$creditor,$antecedent,$consequent)
-	    python print 'checking consequent',$consequent
-	    condition($antecedent)
-	    notany
-	        condition($consequent)
 
-# it is a satisified commitment if consequent is satisified
-satisfied_commitment
-	use satisfied_commitment($id, $debtor,$creditor,$antecedent,$consequent)
-	when
-	    org_agent_facts.norm(commitment, $id, $debtor,$creditor,$antecedent,$consequent)
-	    condition($consequent)
+
+
+
 #
 ##POWER
 power
@@ -129,13 +148,12 @@ condition_stative
 	    $consequent=consequent
 	    org_agent_facts.stative($state,$debtor,$creditor,$antecedent,$consequent)
 
-#consequent example:
-#request example request('negotiate_resource', 'shenrie', 'glider55', {'duration': 5})
-
+#example value of $a: ('request', 'get_temp', 'shenrie', 'glider55')
+#request example in knowledge_base request('negotiate_resource', 'shenrie', 'glider55', {'duration': 5})
 condition_request
 	use condition($a)
 	when
-	    python print 'check req length',$a,len($a)
+	    python print 'check request length',$a,len($a)
 	    check len($a) == 4
 	    python 'check req length',$a,len($a)
 	    python request,request_type,requester,servicer=$a
@@ -143,7 +161,36 @@ condition_request
 	    $request_type=request_type
 	    $requester=requester
 	    $servicer=servicer
-	    org_agent_facts.request($request_type,$requester,$servicer,$parameter)
+	    #$parameter=parameter
+	    org_agent_facts.$request($request_type,$requester,$servicer,$parameter)
+
+#example value of $a: ('escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
+#example value in knowledge base:escalate( 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
+predicate_exists
+    use condition($a)
+    when
+        python print 'check predicate length',$a,len($a)
+        check len($a) == 4
+        python op,servicer,requester,arguments=$a
+        #$data=data
+        #python op,servicer,requester,arguments=$data
+        $op=op
+        $servicer=servicer
+        $requester=requester
+        $arguments=arguments
+        org_agent_facts.$op($servicer,$requester,$arguments)
+
+condition_norm_state
+	use condition($a)
+	when
+	    python print 'check norm state',$a,len($a)
+	    check len($a) == 2
+	    python state,norm_id=$a
+	    $state=state
+	    $norm_id=norm_id
+	    python print 'checking state ',$state,$norm_id
+	    $state($norm_id)
+
 
 #condition_service
 #	use condition($a)
@@ -163,6 +210,7 @@ condition_request
 condition_norm
     use condition($a)
     when
+        python print 'checking condition norm ', $a
         check len($a)==2
         python norm,parameter=$a
         $norm=norm
@@ -174,46 +222,8 @@ condition_norm
         org_agent_facts.norm($norm_type,$id,$_debtor,$_creditor,$_antecedent,$_consequent)
 
 
-predicate_condition
-	use condition($antecedent)
-	when
-	    python print 'check predicate'
-	    check len($antecedent)==3
-	    python predicate,predicate_type,parameters=$antecedent
-	    check predicate=='predicate'
-	    $predicate_type=predicate_type
-	    $parameters=parameters
-	    python print "commitments antecedent", $antecedent, $predicate_type, $parameters
-	    org_agent_facts.$predicate_type($parameters)
-
-condition_predicate
-	use pcondition($a)
-	when
-	    python print "h"
-	    org_agent_facts.predicate($b,$c)
-	    python print "h",$c
-	    org_agent_facts.$b($c)
 
 
-test_patterned_event
-	use pevent($a)
-	when
-	    python event_type, parameters=$a
-	    $event_type=event_type
-	    $parameters=parameters
-
-test_stative
-	use Xstative($a)
-	when
-	    org_agent_facts.stative($a)
-test_stative2
-	use Ostative($state,$debtor,$creditor,$antecedent,$consequent)
-	when
-	    org_agent_facts.stative($state,$debtor,$creditor,$antecedent,$consequent)
-
-####
-####EVENT
-####
 ##
 ##
 ####
@@ -266,5 +276,6 @@ or_condition_base_parenthetical_b
 ##
 ##CONDITIONS
 ##
+
 
 

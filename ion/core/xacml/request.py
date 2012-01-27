@@ -40,7 +40,7 @@ AnyUriAttributeValue = attributeValueFactory(AttributeValue.ANY_TYPE_URI)
 StringAttributeValue = attributeValueFactory(AttributeValue.STRING_TYPE_URI)
 TimeAttributeValue = attributeValueFactory(AttributeValue.TIME_TYPE_URI)
 
-AGENT_NAME='org_agent'
+#AGENT_NAME='org_agent'
 
 
 def _createPDP():
@@ -50,7 +50,6 @@ def _createPDP():
 
 def _createRequestCtx(invocation):
     headers=invocation.content
-    log.info('here '+str(headers))
 
     subject_id=headers['user-id']
     resource_id=headers['receiver-name']
