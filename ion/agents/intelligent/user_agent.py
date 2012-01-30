@@ -14,10 +14,11 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess, ServiceClient
+from ion.core.process.service_process import ServiceProcess, AgentClient, ServiceClient
 from ion.agents.intelligent.resource_agent import ResourceAgentServiceClient
 from ion.agents.intelligent.org_agent import OrgAgentServiceClient
 from ion.core.intercept.governance_support import GovernanceSupport
+from collections import deque
 
 AGENT_NAME='user_agent'
 
@@ -61,7 +62,49 @@ class UserAgentService(ServiceProcess):
             yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
-    def op_resource_request(self, content, headers, msg):
+    def op_agent_op(self, content, headers, msg):
+        #check the normative filter for obligation
+        log.info('applying normative filter')
+        self.store(content['op'], [headers['user-id'], content['receiver-name'], str(content['content'])])
+
+        response_queue = deque()
+        try:
+            consequents=self.governance_support.check_detached_commitments(headers)
+            log.debug('consequents from detached commitment are '+str(consequents))
+            for consequent in consequents:
+                if len(consequent)==21:
+                    op,parameters=consequent
+                else :
+                    op=consequent
+                    parameters=None
+                response_queue.append(getattr(self, op)(content, headers, msg, parameters))
+        except Exception as exception:
+                log.debug(exception)
+                response_queue.append({'resource_id':headers['receiver-name'],'consequent':None})
+                log.info('##### NOT OBLIGATED ANYMORE')
+
+        yield self.reply_ok(msg, response_queue, {})
+
+    #sometimes the consequent may simply be creation of another norm
+    def norm(self,content,headers,msg,parameters):
+
+        #parameters example: (commitment,COM3,(request,get_temp,shenrie,glider55),get_temp)
+        # norm example: norm('commitment', 'COM3', 'glider55', 'shenrie', ('request', 'get_temp', 'shenrie', 'glider55'), 'get_temp')
+        norm_type,id,antecedent,consequent=parameters
+        debtor=headers['receiver-name']
+        creditor=headers['user-id']
+        response={'resource_id':debtor,'consequent':None}
+        try:
+            norm=[norm_type,id, debtor, creditor,antecedent,consequent]
+            self.store('norm',norm)
+            response={'resource_id':debtor,'belief':'norm','consequent':norm}
+        except Exception as exception:
+            log.debug(exception)
+            log.error('SEVERE ERROR; Failed to create norm as indicated by consequent')
+        return response
+
+    @defer.inlineCallbacks
+    def op_resource_request(self, content, headers, msg, parameters):
 
         #generate header for the message to the resource agent
         op=content['op']
@@ -143,7 +186,8 @@ class UserAgentService(ServiceProcess):
 
 
 
-class UserAgentServiceClient(ServiceClient):
+
+class UserAgentServiceClient(AgentClient):
     """
     This service client calls the user_agent service. It
     makes service calls RPC style.
@@ -151,14 +195,14 @@ class UserAgentServiceClient(ServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = AGENT_NAME
-        ServiceClient.__init__(self, proc, **kwargs)
-        
+        AgentClient.__init__(self, proc, **kwargs)
+
 
     @defer.inlineCallbacks
     def request(self, op, headers=None):
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send(op,headers['content'],headers)
-        defer.returnValue(str(content))
+        defer.returnValue(content)
         
     
     def request_deferred(self, request=None):
