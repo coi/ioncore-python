@@ -9,7 +9,7 @@ log = ion.util.ionlog.getLogger(__name__)
 from pyke import knowledge_engine
 from pyke import *
 from twisted.internet import defer
-
+from collections import deque
 
 DROP='drop'
 my_engine = knowledge_engine.engine(__file__)
@@ -47,20 +47,21 @@ class GovernanceSupport():
         #log.info(agent + ' checks Governance applied on ' + user_id + ' '+ org + ' ' + str(subjectRoles) + ' '+ resource_id + ' '+ op + ' '+ agent)
         if self.agent == 'org_agent' or self.agent=='resource_agent' or self.agent=='user_agent':
             try:
+                log.info('##### updating agent belief to reflect that request was made ')
+                #self.store(agent+'_facts','belief',[ headers['op'], headers['user-id'], headers['receiver-name'],  headers['content']])
+                self.store(self.agent+'_facts',headers['op'], [ headers['user-id'], headers['receiver-name'], str(headers['content'])])
                 log.debug('##### ')
                 log.debug('##### ')
                 log.debug('##### ')
                 log.debug('##### '+self.agent + ' checking ' +user_id + str(subjectRoles) +' for .authorization($id,'+user_id+','+resource_id+','+op+',$consequent)')
-                vars, plan = my_engine.prove_1_goal(self.agent+'.authorization($id,'+user_id+','+resource_id+','+op+',$consequent)')
-                permission=vars['consequent']
+                vars, plan = my_engine.prove_1_goal(self.agent+'.authorization($id,'+user_id+','+resource_id+',$antecedent)'+','+op+')')
+                antecedent=vars['antecedent']
                 id=vars['id']
-                log.info('##### '+'norm '+id + ' permits '+user_id+' to perform ' + op + ' on '+ resource_id)
-                log.info('##### updating agent belief to reflect that request was made ')
-                #self.store(agent+'_facts','belief',[ headers['op'], headers['user-id'], headers['receiver-name'],  headers['content']])
-                self.store(self.agent+'_facts',headers['op'], [ headers['user-id'], headers['receiver-name'], str(headers['content'])])
+                log.info('##### '+'in norm '+id + ' antecedent '+antecedent +' is true thus authorizing '+user_id+' to perform ' + op + ' on '+ resource_id)
+
             except Exception as exception:
                 log.debug(exception)
-                permission = DROP
+                antecedent = DROP
                 log.info('##### no authorization')
                 #try:
                 #    log.debug('#####'+'checking authorization')
@@ -72,9 +73,10 @@ class GovernanceSupport():
             log.debug('#####')
             log.debug('#####')
             log.debug('#####')
-        return permission
+        return antecedent
 
     def check_detached_commitments(self,headers):
+        consequents = deque()
         log.info('headers: ' + str(headers))
         if 'receiver-name' in headers:
             resource_id = headers['receiver-name']
@@ -93,21 +95,24 @@ class GovernanceSupport():
             try:
                 log.debug('##### '+self.agent + ' checking ' +resource_id +' for .commitment($id,'+resource_id+','+user_id+',$antecedent,$consequent) to ' + user_id)
                 #vars, plan = my_engine.prove_1_goal(self.agent+'.violated_commitment($id,'+resource_id+','+user_id+','+op+',$response)')
-                vars, plan = my_engine.prove_1_goal(self.agent+'.detached_commitment($id,'+resource_id+','+user_id+',$antecedent,$consequent)')
-                #vars, plan = my_engine.prove_1_goal(self.agent+'.authorization($id,'+user_id+','+resource_id+','+op+',$response)')
-                consequent=vars['consequent']
-                id=vars['id']
-                antecedent=vars['antecedent']
-                log.info('##### '+id + ' commits '+resource_id+'\'s agent to do ' + str(consequent) +' if '+ user_id+'\'s agent does '+ str(antecedent))
+                with my_engine.prove_goal(self.agent+'.detached_commitment($id,'+resource_id+','+user_id+',$antecedent,$consequent)') as gen:
+                    for vars, plan in gen:
+                        #vars, plan = my_engine.prove_1_goal(self.agent+'.authorization($id,'+user_id+','+resource_id+','+op+',$response)')
+                        consequents.append(vars['consequent'])
+                        id=vars['id']
+                        antecedent=vars['antecedent']
+                        log.info('##### '+id + ' commits '+resource_id+'\'s agent to do ' + str(consequent) +' if '+ user_id+'\'s agent does '+ str(antecedent))
+
             except Exception as exception:
                 log.debug(exception)
-                consequent = DROP
+                consequents.append(DROP)
                 log.info('##### no commitments')
 
-        return consequent
+        return consequents
 
 
     def check_pending_sanctions(self,headers):
+        consequents=deque()
         log.info('check pending sanctions headers: ' + str(headers) +' in '+self.agent)
         if 'receiver-name' in headers:
             resource_id = headers['receiver-name']
@@ -127,18 +132,19 @@ class GovernanceSupport():
             try:
                 log.debug('##### '+self.agent + ' checking ' +resource_id +' for .pending_sanction($id,'+user_id+','+resource_id+',$antecedent,$consequent) to ' + user_id)
                 #vars, plan = my_engine.prove_1_goal(self.agent+'.violated_commitment($id,'+resource_id+','+user_id+','+op+',$response)')
-                vars, plan = my_engine.prove_1_goal(self.agent+'.pending_sanction($id,'+user_id+',$creditor,$antecedent,$consequent)')
-                #vars, plan = my_engine.prove_1_goal(self.agent+'.authorization($id,'+user_id+','+resource_id+','+op+',$response)')
-                consequent=vars['consequent']
-                id=vars['id']
-                antecedent=vars['antecedent']
-                log.info('##### '+id + ' requires '+resource_id+'\'s agent to carry out sanction ' + str(consequent) +' since '+ user_id+'\'s agent '+ str(antecedent))
+                with my_engine.prove_goal(self.agent+'.pending_sanction($id,'+user_id+',$creditor,$antecedent,$consequent)') as gen:
+                    for var, plan in gen:
+                    #vars, plan = my_engine.prove_1_goal(self.agent+'.authorization($id,'+user_id+','+resource_id+','+op+',$response)')
+                        consequents.append(vars['consequent'])
+                        id=vars['id']
+                        antecedent=vars['antecedent']
+                        log.info('##### '+id + ' requires '+resource_id+'\'s agent to carry out sanction ' + str(consequent) +' since '+ user_id+'\'s agent '+ str(antecedent))
             except Exception as exception:
                 log.debug(exception)
-                consequent = DROP
+                consequents.append(DROP)
                 log.info('##### no commitments')
 
-        return consequent
+        return consequents
 
     def store(self,kb_name,fact_name,arguments):
         log.debug('storing in '+kb_name+' '+fact_name+' '+str(arguments))
