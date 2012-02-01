@@ -6,7 +6,6 @@
 @brief An example service definition that can be used as template.
 """
 
-print str(__name__)
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
@@ -14,15 +13,13 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess, AgentClient, ServiceClient
+from ion.core.process.service_process import ServiceProcess
 from ion.agents.intelligent.resource_agent import ResourceAgentServiceClient
 from ion.agents.intelligent.org_agent import OrgAgentServiceClient
-from ion.core.intercept.governance_support import GovernanceSupport
-from collections import deque
-
+from ion.agents.intelligent.agent_service_process import AgentServiceProcess, AgentClient
 AGENT_NAME='user_agent'
 
-class UserAgentService(ServiceProcess):
+class UserAgentService(AgentServiceProcess):
     """
     Example service interface
     """
@@ -32,12 +29,9 @@ class UserAgentService(ServiceProcess):
                                              dependencies=[])
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
+        print 'my name is' + self.__name__
         ServiceProcess.__init__(self, *args, **kwargs)
         log.info('UserAgentService.__init__()')
-
-    def slc_init(self):
-        # Service life cycle state. Initialize service here. Can use yields.
-        self.governance_support = GovernanceSupport(AGENT_NAME)
 
 
 
@@ -46,8 +40,7 @@ class UserAgentService(ServiceProcess):
     def op_org_request(self, content, headers, msg):
         op=content['op']
         headers={'receiver-name':content['receiver-name'], 'op':op, 'content':content['content'], 'user-id':headers['user-id']}
-        self.store(op, [headers['user-id'], content['receiver-name'], str(content['content'])])
-        
+
         try:
             oasc = OrgAgentServiceClient()
             response = yield oasc.request(op,headers)
@@ -61,47 +54,6 @@ class UserAgentService(ServiceProcess):
         else:
             yield self.reply_ok(msg, response, {})
 
-    @defer.inlineCallbacks
-    def op_agent_op(self, content, headers, msg):
-        #check the normative filter for obligation
-        log.info('applying normative filter')
-        self.store(content['op'], [headers['user-id'], content['receiver-name'], str(content['content'])])
-
-        response_queue = deque()
-        try:
-            consequents=self.governance_support.check_detached_commitments(headers)
-            log.debug('consequents from detached commitment are '+str(consequents))
-            for consequent in consequents:
-                if len(consequent)==21:
-                    op,parameters=consequent
-                else :
-                    op=consequent
-                    parameters=None
-                response_queue.append(getattr(self, op)(content, headers, msg, parameters))
-        except Exception as exception:
-                log.debug(exception)
-                response_queue.append({'resource_id':headers['receiver-name'],'consequent':None})
-                log.info('##### NOT OBLIGATED ANYMORE')
-
-        yield self.reply_ok(msg, response_queue, {})
-
-    #sometimes the consequent may simply be creation of another norm
-    def norm(self,content,headers,msg,parameters):
-
-        #parameters example: (commitment,COM3,(request,get_temp,shenrie,glider55),get_temp)
-        # norm example: norm('commitment', 'COM3', 'glider55', 'shenrie', ('request', 'get_temp', 'shenrie', 'glider55'), 'get_temp')
-        norm_type,id,antecedent,consequent=parameters
-        debtor=headers['receiver-name']
-        creditor=headers['user-id']
-        response={'resource_id':debtor,'consequent':None}
-        try:
-            norm=[norm_type,id, debtor, creditor,antecedent,consequent]
-            self.store('norm',norm)
-            response={'resource_id':debtor,'belief':'norm','consequent':norm}
-        except Exception as exception:
-            log.debug(exception)
-            log.error('SEVERE ERROR; Failed to create norm as indicated by consequent')
-        return response
 
     @defer.inlineCallbacks
     def op_resource_request(self, content, headers, msg, parameters):
@@ -111,7 +63,6 @@ class UserAgentService(ServiceProcess):
         headers={'receiver-name':content['receiver-name'], 'op':op, 'content':content['content'], 'user-id':headers['user-id']}
         #store the fact that you attempted the request
         #belief('request', 'enroll','shenrie', 'SCILAB', {'role':'researcher'})
-        self.store(op, [headers['user-id'], content['receiver-name'], str(content['content'])])
         try:
             #make request to the resource agent
             rasc = ResourceAgentServiceClient()
@@ -120,7 +71,6 @@ class UserAgentService(ServiceProcess):
         except Exception as exception:
             #if resource agent does not respond store the fact
             response={'belief':'refused','consequent':[op,headers['user-id'], content['receiver-name'], str(content['content'])]}
-            self.store(response['belief'],response['consequent'])
 
             #check if there is a sanction for an unexpected response
             log.info('No response received from the resource agent, checking for applicable sanctions')
@@ -144,45 +94,6 @@ class UserAgentService(ServiceProcess):
 
         yield self.reply_ok(msg, response, {})
 
-    def check_pending_sanctions(self, content, headers, msg):
-        #check the normative filter for obligation
-        log.info('applying normative filter')
-        try:
-            #consequent example: ('make_request', 'escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1'))
-            consequent= self.governance_support.check_pending_sanctions(headers)
-            log.debug('consequent in NF is '+str(consequent))
-
-            if len(consequent)==4:
-                #assumes sanction have consequent that have an operation to be issued by creditor to debtor with parameters
-                op,creditor,debtor,parameters=consequent
-                parameters=[creditor,debtor,parameters]
-            else:
-                #consequent has an operation without parameters
-                op=consequent
-                parameters=None
-
-            #perform the operation op
-            response=getattr(self, op)(content, headers, msg, parameters)
-
-        except Exception as exception:
-                log.debug(exception)
-                response={'resource_id':headers['receiver-name'],'consequent':None}
-                log.error('##### NO SANCTIONS APPLIED #####')
-        return response
-
-    def escalate(self,content,headers,msg,parameters):
-        creditor,debtor,parameters=parameters
-        op=parameters[0]
-
-        #override the content with headers information because op_org_request will inspect
-        #the content and form a header out of it
-        content={'receiver-name':debtor, 'op':op, 'content':parameters, 'user-id':creditor}
-
-        return self.op_org_request(content,headers,msg)
-
-
-    def store(self,fact_name,arguments):
-        self.governance_support.store(AGENT_NAME+'_facts',fact_name,arguments)
 
 
 
