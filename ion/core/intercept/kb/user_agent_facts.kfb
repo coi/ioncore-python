@@ -60,6 +60,7 @@ norm(sanction, SAN1, shenrie, glider55, (violated_commitment,COM3), (escalate,sh
 
 #ORG DEFINITION (USER)
 norm(authorization, AUTH6, shenrie, DONTCARE, sanction, permit)
+norm(authorization, AUTH6, shenrie, DONTCARE, agent_op, permit)
 norm(authorization, AUTH7, mmeisinger,DONTCARE,contribute,permit)
 norm(authorization, AUTH8, shenrie,DONTCARE,enroll,permit)
 norm(authorization, AUTH9, mmeisinger,DONTCARE,enroll,permit)

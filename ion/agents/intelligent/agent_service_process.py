@@ -3,7 +3,7 @@
 """
 @file ion/play/user_agent_service.py
 @author Prashant Kediyal
-@brief An example service definition that can be used as template.
+@brief The base Agent class that must be extended to build agents
 """
 
 import ion.util.ionlog
@@ -12,9 +12,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 
-from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess
-from ion.agents.intelligent.resource_agent import ResourceAgentServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.agents.intelligent.org_agent import OrgAgentServiceClient
 from ion.core.intercept.governance_support import GovernanceSupport
 from collections import deque
@@ -28,11 +26,24 @@ class AgentServiceProcess(ServiceProcess):
             self.AGENT_NAME==self.__name__
         self.governance_support = GovernanceSupport(self.AGENT_NAME)
 
-    @defer.inlineCallbacks
-    def op_perform_obligations(self, content, headers, msg):
-        #check for obligations
-        log.info('performing obligations')
+    @defer.inlinecallbacks
+    def op_process_request(self,content,headers,msg):
+
+        log.info('storing received request')
         self.store(content['op'], [headers['user-id'], content['receiver-name'], content['content']])
+        response_queue = deque()
+
+        log.info('performing obligations')
+        response_queue.append(self.perform_obligations(self, content, headers, msg))
+
+        log.info('applying sanctions')
+        response_queue.append(self.apply_sanctions(self, content, headers, msg))
+
+        yield response_queue
+
+    @defer.inlineCallbacks
+    def perform_obligations(self, content, headers, msg):
+
 
         response_queue = deque()
         try:
@@ -107,6 +118,7 @@ class AgentServiceProcess(ServiceProcess):
             log.debug(exception)
             log.error('SEVERE ERROR; Failed to create norm ' + str(parameters))
         return response
+    
     @defer.inlineCallbacks
     def escalate(self,content,headers,msg,parameters):
         creditor,debtor,parameters=parameters
@@ -149,4 +161,4 @@ class AgentClient(ServiceClient):
     #@defer.inlineCallbacks
     def rpc_send(self, op, content,headers=None):
         log.debug('this rpc_send is called')
-        return ServiceClient.rpc_send(self,'perform_obligations',content,headers)
+        return ServiceClient.rpc_send(self,'process_request',content,headers)
