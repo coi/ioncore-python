@@ -13,10 +13,12 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.agents.intelligent.resource_agent import ResourceAgentServiceClient
 from ion.agents.intelligent.org_agent import OrgAgentServiceClient
-from ion.agents.intelligent.agent_service_process import AgentServiceProcess, AgentClient
+from ion.core.agents.agent_service_process import AgentServiceProcess, AgentServiceClient
+
+
 AGENT_NAME='user_agent'
 
 class UserAgentService(AgentServiceProcess):
@@ -28,8 +30,8 @@ class UserAgentService(AgentServiceProcess):
                                              version='0.1.0',
                                              dependencies=[])
     def __init__(self, *args, **kwargs):
+        self.AGENT_NAME=AGENT_NAME
         # Service class initializer. Basic config, but no yields allowed.
-        print 'my name is' + self.__name__
         ServiceProcess.__init__(self, *args, **kwargs)
         log.info('UserAgentService.__init__()')
 
@@ -98,7 +100,7 @@ class UserAgentService(AgentServiceProcess):
 
 
 
-class UserAgentServiceClient(AgentClient):
+class UserAgentServiceClient(AgentServiceClient):
     """
     This service client calls the user_agent service. It
     makes service calls RPC style.
@@ -106,8 +108,7 @@ class UserAgentServiceClient(AgentClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = AGENT_NAME
-        AgentClient.__init__(self, proc, **kwargs)
-
+        AgentServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def request(self, op, headers=None):

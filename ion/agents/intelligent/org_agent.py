@@ -6,20 +6,17 @@
 @brief An example service definition that can be used as template.
 """
 
-print str(__name__)
 import ion.util.ionlog
 log = ion.util.ionlog.getLogger(__name__)
 
-
 from twisted.internet import defer
-
 from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.core.intercept.governance_support import GovernanceSupport
+from ion.core.process.service_process import ServiceProcess
+from ion.core.agents.agent_service_process import AgentServiceProcess, AgentServiceClient
 
 AGENT_NAME='org_agent'
 
-class OrgAgentService(ServiceProcess):
+class OrgAgentService(AgentServiceProcess):
     """
     Example service interface
     """
@@ -29,42 +26,33 @@ class OrgAgentService(ServiceProcess):
                                              dependencies=[])
 
     def __init__(self, *args, **kwargs):
-        # Service class initializer. Basic config, but no yields allowed.
-        ServiceProcess.__init__(self, *args, **kwargs)
+        self.AGENT_NAME=AGENT_NAME
+        AgentServiceProcess.__init__(self, *args, **kwargs)
         log.info('OrgAgentService.__init__()')
 
-    def slc_init(self):
-        # Service life cycle state. Initialize service here. Can use yields.
-        self.governance_support = GovernanceSupport(AGENT_NAME)
-    
-        
-
     @defer.inlineCallbacks
-    def op_enroll(self, content, headers, msg):
+    def enroll(self, content, headers, msg):
         log.info('enrolling '+headers['user-id'] + ' in org '+headers['receiver-name'])
-        consequent=[headers['user-id'], content['role'], headers['receiver-name']]
-        response={'belief':'enroll','consequent':consequent}
+        parameters=(headers['user-id'], content['role'], headers['receiver-name'])
+        response=('enrolled',parameters)
         yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
-    def op_sanction(self, content, headers, msg):
-
+    def sanction(self, content, headers, msg):
         op,op_id,sanctioned_user=content
         consequent=[sanctioned_user, headers['receiver-name']]
-        response={'belief':'eject','consequent':consequent}
-        self.store(response['belief'],response['consequent'])
+        response=('ejected',consequent)
         yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
-    def op_contribute(self, content, headers, msg):
+    def contribute(self, content, headers, msg):
         log.info(headers['user-id']+' contributing '+str(content['resource_id'])+', action '+ str(content['action'])+ ' to org '+headers['receiver-name'])
         consequent=[headers['user-id'],content['resource_id'],content['action'],headers['receiver-name']]
-        response={'belief':'contribute','consequent':consequent}
-
+        response=('contributed',consequent)
         yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
-    def op_list_resources(self, content, headers, msg):
+    def list_resources(self, content, headers, msg):
         org = headers['receiver-name']
         log.info('listing resources for ' + org)
         vars=self.governance_support.list(AGENT_NAME+'_facts','contributed','($user,$resource,$action,'+org+')')
@@ -74,7 +62,7 @@ class OrgAgentService(ServiceProcess):
         yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
-    def op_list_users(self, content, headers, msg):
+    def list_users(self, content, headers, msg):
         org=headers['receiver-name']
         log.info('listing users in ' + org)
         vars=self.governance_support.list(AGENT_NAME+'_facts','enrolled','($user,$role,'+org+')')
@@ -84,7 +72,7 @@ class OrgAgentService(ServiceProcess):
         yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
-    def op_validate_token(self, content, headers, msg):
+    def validate_token(self, content, headers, msg):
         token=content['token']
         org=headers['receiver-name']
         log.info('validating token ' + token)
@@ -97,7 +85,7 @@ class OrgAgentService(ServiceProcess):
         yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
-    def op_validate_enrollment(self, content, headers, msg):
+    def validate_enrollment(self, content, headers, msg):
         user_id=headers['user-id']
         org=headers['receiver-name']
         log.info('validating user ' + user_id)
@@ -109,28 +97,23 @@ class OrgAgentService(ServiceProcess):
                 break
         yield self.reply_ok(msg, response, {})
 
-    def store(self,fact_name,arguments):
-        self.governance_support.store(AGENT_NAME+'_facts',fact_name,arguments)
-
-class OrgAgentServiceClient(ServiceClient):
+class OrgAgentServiceClient(AgentServiceClient):
     """
-    This is an exemplar service client that calls the user_agent service. It
+    This service client calls the org_agent service. It
     makes service calls RPC style.
     """
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = AGENT_NAME
-        ServiceClient.__init__(self, proc, **kwargs)
-        
+        AgentServiceClient.__init__(self, proc, **kwargs)
 
     @defer.inlineCallbacks
     def request(self, op, headers=None):
-         yield self._check_init()
-         log.info('request headers '+ str(headers))
-         (content, headers, msg) = yield self.rpc_send(op,headers['content'],headers)
-         defer.returnValue(content)
+        yield self._check_init()
+        (content, headers, msg) = yield self.rpc_send(op,headers['content'],headers)
+        defer.returnValue(content)
 
-    
+
     def request_deferred(self, request=None):
         return self.rpc_send('service_request', request)
 

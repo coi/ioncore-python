@@ -12,7 +12,8 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 
-from ion.core.process.service_process import ServiceProcess, ServiceClient
+from ion.core.process.service_process import ServiceProcess
+from ion.core.process.process import ProcessClient
 from ion.agents.intelligent.org_agent import OrgAgentServiceClient
 from ion.core.intercept.governance_support import GovernanceSupport
 from collections import deque
@@ -23,14 +24,16 @@ class AgentServiceProcess(ServiceProcess):
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
         if  self.AGENT_NAME == None:
+            print 'no agent name?'
             self.AGENT_NAME==self.__name__
         self.governance_support = GovernanceSupport(self.AGENT_NAME)
 
-    @defer.inlinecallbacks
+    #@defer.inlinecallbacks
     def op_process_request(self,content,headers,msg):
 
         log.info('storing received request')
-        self.store(content['op'], [headers['user-id'], content['receiver-name'], content['content']])
+        #self.store(content['op'], [headers['user-id'], content['receiver-name'], content['content']])
+        self.store(content[1], (headers['user-id'], content[0], content[2]))
         response_queue = deque()
 
         log.info('performing obligations')
@@ -39,9 +42,9 @@ class AgentServiceProcess(ServiceProcess):
         log.info('applying sanctions')
         response_queue.append(self.apply_sanctions(self, content, headers, msg))
 
-        yield response_queue
+        return response_queue
 
-    @defer.inlineCallbacks
+    #@defer.inlineCallbacks
     def perform_obligations(self, content, headers, msg):
 
 
@@ -69,7 +72,7 @@ class AgentServiceProcess(ServiceProcess):
                 log.debug(exception)
                 response_queue.append(exception)
 
-        yield self.reply_ok(msg, response_queue, {})
+        return self.reply_ok(msg, response_queue, {})
 
     def apply_sanctions(self, content, headers, msg):
         #check for pending_sanctions
@@ -101,7 +104,7 @@ class AgentServiceProcess(ServiceProcess):
                 log.debug(exception)
                 response_queue.append(exception)
 
-        yield self.reply_ok(msg, response_queue, {})
+        return self.reply_ok(msg, response_queue, {})
 
     #sometimes the consequent may simply be creation of another norm
     def norm(self,content,headers,msg,parameters):
@@ -118,8 +121,8 @@ class AgentServiceProcess(ServiceProcess):
             log.debug(exception)
             log.error('SEVERE ERROR; Failed to create norm ' + str(parameters))
         return response
-    
-    @defer.inlineCallbacks
+
+    #@defer.inlineCallbacks
     def escalate(self,content,headers,msg,parameters):
         creditor,debtor,parameters=parameters
         op=parameters[0]
@@ -129,11 +132,12 @@ class AgentServiceProcess(ServiceProcess):
         response=None
         try:
             oasc = OrgAgentServiceClient()
-            response = yield oasc.request(op,headers)
+            #response = yield oasc.request(op,headers)
+            response = oasc.request(op,headers)
         except Exception as exception:
             log.error(exception)
             log.error('SEVERE ERROR; Failed to escalate ' + str(parameters))
-        yield response
+        return response
 
 
     def store(self,fact_name,arguments):
@@ -142,7 +146,7 @@ class AgentServiceProcess(ServiceProcess):
 
 
 
-class AgentClient(ServiceClient):
+class AgentServiceClient(ProcessClient):
     """
     This is the base class for service client libraries. Service client libraries
     can be used from any process or standalone (in which case they spawn their
@@ -158,7 +162,6 @@ class AgentClient(ServiceClient):
         super.__self__.proc.container.name_exists(name, scope='system')
 
 
-    #@defer.inlineCallbacks
     def rpc_send(self, op, content,headers=None):
         log.debug('this rpc_send is called')
         return ServiceClient.rpc_send(self,'process_request',content,headers)

@@ -37,10 +37,11 @@ class UserOne(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def send_request(self, user_id='shenrie', resource_id='glider56', action='get_temp',op='resource_request',content={}):
+    def send_request(self, user_id='shenrie', resource_id='glider56', action='get_temp',op='resource_request',content=()):
         uasc = UserAgentServiceClient(proc=self)
         #header for the user agent
-        headers={'user-id':user_id, 'content' : {'receiver-name':resource_id,'op':action, 'content':content}, 'receiver-name':user_id}
+        #headers={'user-id':user_id, 'content' : {'receiver-name':resource_id,'op':action, 'content':content}, 'receiver-name':user_id}
+        headers={'user-id':user_id, 'content' : (resource_id,action,content), 'receiver-name':user_id}
         response  = yield uasc.request(op, headers)
         log.info('response: '+str(response))
 
@@ -53,7 +54,7 @@ class UserOne(ServiceProcess):
          self.send_request(user_id, resource_id, action, op, {'duration':duration})
 
     def enroll(self, user_id='shenrie', resource_id = 'SCILAB', action='enroll', role='student', op='org_request'):
-        self.send_request(user_id, resource_id, action, op, {'role':role})
+        self.send_request(user_id, resource_id, action, op, (role))
 
     def list_resources(self, resource_id = 'SCILAB', user_id='shenrie', action='list_resources', op='org_request'):
         log.info('user requests list of resources from ' + resource_id)

@@ -37,12 +37,8 @@ class GovernanceSupport():
             return 'inapplicable'
 
         user_id=headers['user-id']
-        org='ooi'
-        subjectRoles=['researcher']
         op=headers['op']
         permission='null'
-        my_engine.reset()
-        my_engine.activate(self.agent)
         # Runs all applicable forward-chaining rules.
         #log.info(agent + ' checks Governance applied on ' + user_id + ' '+ org + ' ' + str(subjectRoles) + ' '+ resource_id + ' '+ op + ' '+ agent)
         if self.agent == 'org_agent' or self.agent=='resource_agent' or self.agent=='user_agent':
@@ -53,7 +49,7 @@ class GovernanceSupport():
                 log.debug('##### ')
                 log.debug('##### ')
                 log.debug('##### ')
-                log.debug('##### '+self.agent + ' checking ' +user_id + str(subjectRoles) +' for .authorization($id,'+user_id+','+resource_id+','+op+',$consequent)')
+                log.debug('##### '+self.agent + ' checking ' +user_id  +' for .authorization($id,'+user_id+','+resource_id+','+op+',$consequent)')
                 vars, plan = my_engine.prove_1_goal(self.agent+'.authorization($id,'+user_id+','+resource_id+',$antecedent)'+','+op+')')
                 antecedent=vars['antecedent']
                 id=vars['id']
@@ -84,13 +80,8 @@ class GovernanceSupport():
             return 'inapplicable'
 
         user_id=headers['user-id']
-        org='ooi'
-        subjectRoles=['researcher']
         op=headers['op']
-        #self.agent=headers['receiver'].split(".")[1]
         consequent='null'
-        my_engine.reset()
-        my_engine.activate(self.agent)
         if self.agent == 'org_agent' or self.agent=='resource_agent' or self.agent=='user_agent':
             try:
                 log.debug('##### '+self.agent + ' checking ' +resource_id +' for .commitment($id,'+resource_id+','+user_id+',$antecedent,$consequent) to ' + user_id)
@@ -120,12 +111,7 @@ class GovernanceSupport():
             return 'inapplicable'
 
         user_id=headers['user-id']
-        org='ooi'
-        subjectRoles=['researcher']
         op=headers['op']
-        #agent=headers['receiver'].split(".")[1]
-        my_engine.reset()
-        my_engine.activate(self.agent)
 
         consequent='null'
         if self.agent == 'org_agent' or self.agent=='resource_agent' or self.agent=='user_agent':
