@@ -13,7 +13,6 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.agents.intelligent.resource_agent import ResourceAgentServiceClient
 from ion.agents.intelligent.org_agent import OrgAgentServiceClient
 from ion.core.agents.agent_service_process import AgentServiceProcess, AgentServiceClient
@@ -26,42 +25,43 @@ class UserAgentService(AgentServiceProcess):
     Example service interface
     """
     # Declaration of service
-    declare = ServiceProcess.service_declare(name=AGENT_NAME,
+    declare = AgentServiceProcess.service_declare(name=AGENT_NAME,
                                              version='0.1.0',
                                              dependencies=[])
     def __init__(self, *args, **kwargs):
         self.AGENT_NAME=AGENT_NAME
         # Service class initializer. Basic config, but no yields allowed.
-        ServiceProcess.__init__(self, *args, **kwargs)
+        AgentServiceProcess.__init__(self, *args, **kwargs)
         log.info('UserAgentService.__init__()')
 
 
 
 
     @defer.inlineCallbacks
-    def op_org_request(self, content, headers, msg):
-        op=content['op']
-        headers={'receiver-name':content['receiver-name'], 'op':op, 'content':content['content'], 'user-id':headers['user-id']}
+    def op_org_request(self, content, headers, msg,requester,servicer,parameters):
+
+        #(parameters=(enroll,(student))))
+        op,parameters=parameters
+        #todo take off the op parameter below
+        headers={'op':op,'agent-op':op,'user-id':requester,'receiver-name':servicer,'content':parameters}
 
         try:
             oasc = OrgAgentServiceClient()
+            # response returned should be (enroll,(shenrie,SCILAB,student))
             response = yield oasc.request(op,headers)
         except Exception as exception:
             #if org agent does not respond, store the fact
-            response={'belief':'refused','consequent':[op,[headers['user-id'], content['receiver-name'], str(content['content'])]]}
+            #response={'belief':'refused','consequent':[op,[headers['user-id'], content['receiver-name'], str(content['content'])]]}
+            response=None
 
-        self.store(response['belief'],response['consequent'])
-        if response['belief']=='eject':
-            yield response
-        else:
-            yield self.reply_ok(msg, response, {})
+        yield response
 
 
     @defer.inlineCallbacks
     def op_resource_request(self, content, headers, msg, parameters):
 
         #generate header for the message to the resource agent
-        op=content['op']
+        op=content['agent-op']
         headers={'receiver-name':content['receiver-name'], 'op':op, 'content':content['content'], 'user-id':headers['user-id']}
         #store the fact that you attempted the request
         #belief('request', 'enroll','shenrie', 'SCILAB', {'role':'researcher'})

@@ -12,9 +12,7 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 
-from ion.core.process.service_process import ServiceProcess
-from ion.core.process.process import ProcessClient
-from ion.agents.intelligent.org_agent import OrgAgentServiceClient
+from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.intercept.governance_support import GovernanceSupport
 from collections import deque
 
@@ -24,23 +22,22 @@ class AgentServiceProcess(ServiceProcess):
     def slc_init(self):
         # Service life cycle state. Initialize service here. Can use yields.
         if  self.AGENT_NAME == None:
-            print 'no agent name?'
-            self.AGENT_NAME==self.__name__
+            log.warn('No agent name')
+            self.AGENT_NAME==(self.__name__).rsplit('.',1)[1]
+            log.warn('using '+self.AGENT_NAME+' instead')
         self.governance_support = GovernanceSupport(self.AGENT_NAME)
 
     #@defer.inlinecallbacks
     def op_process_request(self,content,headers,msg):
 
         log.info('storing received request')
-        #self.store(content['op'], [headers['user-id'], content['receiver-name'], content['content']])
-        self.store(content[1], (headers['user-id'], content[0], content[2]))
         response_queue = deque()
-
+    
         log.info('performing obligations')
-        response_queue.append(self.perform_obligations(self, content, headers, msg))
+        response_queue.append(self.perform_obligations(content, headers, msg))
 
         log.info('applying sanctions')
-        response_queue.append(self.apply_sanctions(self, content, headers, msg))
+        #response_queue.append(self.apply_sanctions(content, headers, msg))
 
         return response_queue
 
@@ -51,28 +48,32 @@ class AgentServiceProcess(ServiceProcess):
         response_queue = deque()
         try:
             consequents=self.governance_support.check_detached_commitments(headers)
-            log.debug('consequents from detached commitment are '+str(consequents))
+            log.debug('consequents from detached commitment are :')
+            log.debug(str(consequents))
             for consequent in consequents:
                 #for parameterized consequents
-                if len(consequent)==2:
-                    op,parameters=consequent
+                if len(consequent)==4:
+                    op,requester,servicer,parameters=consequent
                 elif len(consequent)==1 :
                     #non parameterized consequents
                     op=consequent
                     parameters=None
                 else :
-                    op==None
-                    log.error('Error in the way consequent has been declared'+str(consequent))
-                if op!=None:
-                    response=getattr(self, op)(content, headers, msg, parameters)
-                if response !=None:
-                    self.store(response)
-                response_queue.append(response)
+                    log.error('Error in the way consequent has been declared '+str(len(consequent)))
+                    if op == None:
+                        log.error('Error in the way consequent has been declared'+str(consequent))
+                    if op != None:
+                        response=getattr(self, op)(content, headers, msg, requester,servicer,parameters)
+                    if response != None:
+                        self.store(response)
+                    if response != None:
+                        response_queue.append(response)
         except Exception as exception:
                 log.debug(exception)
                 response_queue.append(exception)
 
-        return self.reply_ok(msg, response_queue, {})
+        #return self.reply_ok(msg, response_queue, {})
+        return response_queue
 
     def apply_sanctions(self, content, headers, msg):
         #check for pending_sanctions
@@ -146,7 +147,7 @@ class AgentServiceProcess(ServiceProcess):
 
 
 
-class AgentServiceClient(ProcessClient):
+class AgentServiceClient(ServiceClient):
     """
     This is the base class for service client libraries. Service client libraries
     can be used from any process or standalone (in which case they spawn their

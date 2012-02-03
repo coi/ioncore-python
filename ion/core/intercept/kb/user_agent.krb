@@ -1,4 +1,4 @@
-# $Id: useragent.krb 2011-12-06 pckediya $
+# $Id: user_agent.krb 2011-12-06 pckediya $
 #
 #
 #
@@ -8,6 +8,7 @@
 #
 
 # it is a pending norm if antecedent is satisfied but consequent is not
+
 pending_norm
 	use pending_norm($norm_type,$id,$debtor,$creditor,$antecedent,$consequent)
 	when
@@ -42,13 +43,11 @@ violated_commitment
 	    python print 'violated commitment long form'
 	    detached_commitment($id,$creditor,$debtor,$antecedent,$consequent)
 
-
 # it is a pending commitment if antecedent is satisfied but consequent is not and
 # we are looking at it from the perspective of the debtor
 detached_commitment
 	use detached_commitment($id,$debtor,$creditor,$antecedent,$consequent)
 	when
-	    python print 'checking detached commitment ',$id
 	    pending_norm(commitment,$id,$debtor,$creditor,$antecedent,$consequent)
 
 # it is a pending sanction if antecedent is satisfied but consequent is not
@@ -77,7 +76,8 @@ power_dontcare
 authorization
     use authorization($id, $debtor, $creditor, $antecedent, $consequent)
     when
-        user_agent_facts.norm('authorization',$id, $debtor,$creditor,$antecedent,$consequent)
+        pending_norm('authorization',$id, $debtor,$creditor,$antecedent,$consequent)
+
 
 authorization_dontcare
     use authorization($id, $debtor, $creditor, $antecedent, $consequent)
@@ -134,6 +134,11 @@ condition_parenthetical_event
 	    python print 'condition parenthetical event', $a
 	    user_agent_facts.event($a)
 
+condition_true
+	use condition($a)
+	when
+	    check $a=='true'
+
 condition_stative
 	use condition($a)
 	when
@@ -148,21 +153,21 @@ condition_stative
 	    $consequent=consequent
 	    user_agent_facts.stative($state,$debtor,$creditor,$antecedent,$consequent)
 
-#example value of $a: ('request', 'get_temp', 'shenrie', 'glider55')
-#request example in knowledge_base request('negotiate_resource', 'shenrie', 'glider55', {'duration': 5})
+#example value of $a: ('request', 'get_temp', 'shenrie', 'glider55', ('1200hrs'))
+#request example in knowledge_base request('get_temp', 'shenrie', 'glider55', ('1200hrs'))
 condition_request
 	use condition($a)
 	when
 	    python print 'check request length',$a,len($a)
-	    check len($a) == 4
+	    check len($a) == 5
 	    python 'check req length',$a,len($a)
-	    python request,request_type,requester,servicer=$a
+	    python request,op,requester,servicer,parameters=$a
 	    $request=request
-	    $request_type=request_type
+	    $op=op
 	    $requester=requester
 	    $servicer=servicer
-	    #$parameter=parameter
-	    user_agent_facts.$request($request_type,$requester,$servicer,$parameter)
+	    $parameters=parameters
+	    user_agent_facts.request($request_type,$requester,$servicer,$parameter)
 
 #example value of $a: ('escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
 #example value in knowledge base:escalate( 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
@@ -171,14 +176,16 @@ predicate_exists
     when
         python print 'check predicate length',$a,len($a)
         check len($a) == 4
-        python op,servicer,requester,arguments=$a
+        python op,requester,servicer,arguments=$a
         #$data=data
-        #python op,servicer,requester,arguments=$data
+        #python op,requester,servicer,arguments=$data
         $op=op
-        $servicer=servicer
         $requester=requester
+        $servicer=servicer
         $arguments=arguments
-        user_agent_facts.$op($servicer,$requester,$arguments)
+        user_agent_facts.$op($requester,$servicer,$arguments)
+
+
 
 condition_norm_state
 	use condition($a)

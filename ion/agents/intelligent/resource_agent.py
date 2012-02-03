@@ -11,7 +11,6 @@ log = ion.util.ionlog.getLogger(__name__)
 
 from twisted.internet import defer
 from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess
 from ion.core.agents.agent_service_process import AgentServiceProcess, AgentServiceClient
 
 AGENT_NAME='resource_agent'
@@ -21,7 +20,7 @@ class ResourceAgentService(AgentServiceProcess):
     Example service interface
     """
     # Declaration of service
-    declare = ServiceProcess.service_declare(name=AGENT_NAME,
+    declare = AgentServiceProcess.service_declare(name=AGENT_NAME,
                                              version='0.1.0',
                                              dependencies=[])
 

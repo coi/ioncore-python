@@ -1,71 +1,16 @@
-# $Id: resourceagent.kfb 2011-12-06 pckediya $
-# coding=utf-8
+#############################################
+#############################################
+#############################################
 
-# orgagent.service_instances
-#service_instances(1)
-#orgagent_facts.commitment($debtor,$creditor,$antecedent,$consequent)
-#commitment(self, ooi, ooi_role($ionUserID,student), enroll($ionUserID, SCILAB,student))
-#commitment(self, ooi, ooi_role($ionUserID,researcher), (enroll, ($ionUserID, SCILAB,contributer)))
-#predicate(enroll, (ionUserID, SCILAB,contributer))
-#mpsingh is enrolled in SCILAB
-#enrolled(mpsingh,SCLIAB)
-#alice contributes glider55 with capability get_temp to CHUSLAB
-#contributed(alice, glider55,get_temp, CHUSLAB)
-#commitment(SCILAB, ooi, '', ('predicate', 'enroll', ('ionUserID', 'SCILAB', 'student')))
-#commitment(anl, bob, a, "enroll('bob', 'contributer', 'anl')")
-#stative(COM2, commitment, cancelled)
-#commitment((anl, bob, a, g))
-#commitment(anl)
-#orgagent_facts.event($event)
-#event(a)
-#event(b)
-#event(c)
-#event(d)
-#stative(created, anl, bob, b, g)
-#stative(created, anl, bob, (created, anl, bob, x, y), z)
-#stative((created, anl, bob, (created, anl, bob, b, g), g))
-#token(IPC420, SCILAB)
+#things the simulated user is authorized to do
+norm(authorization, AUTH1, shenrie, shenrie, true, org_request)
 
-#ORG DEFINITION (ORG)
-##norm(power, POW1, SCILAB, DONTCARE, enroll, permit)
-##norm(power, POW2, SCILAB, DONTCARE, list_users, permit)
-##norm(power, POW3, SCILAB, DONTCARE, contribute, permit)
-##norm(power, POW4, glider55, DONTCARE, negotiate_resource, permit)
-##ORG DEFINITION (ORG)
-#norm(authorization, AUTH1, SCILAB, DONTCARE, list_resources, list_resources)
-#norm(authorization, AUTH2, SCILAB, DONTCARE, list_users, list_users)
-#norm(authorization, AUTH3, SCILAB, DONTCARE, validate_token, validate_token)
-#norm(authorization, AUTH4, SCILAB, DONTCARE, validate_enrollment, validate_enrollment)
 
-#ORG DEFINITION (RESOURCE)
-##norm(power, POW5, glider55, DONTCARE, negotiate_resource, permit)
+#things the simulated user is obligated for
+#if shenrie requests an 'org_request' then do an org_request
+norm(commitment, COM1, shenrie, shenrie, (request,org_request,shenrie,shenrie,(enroll,shenrie,SCILAB,((student)))), (org_request,shenrie,SCILAB,(enroll,(student))))
 
-#ORG DEFINITION (RESOURCE)
-norm(authorization, AUTH5, glider55, DONTCARE, negotiate_resource, permit)
-# the commmitment below causes the resource agent to create a commitment when resource is negotiated
-# for the commitment to be created the resource agent should have a corresponding power and authoriztion
-# (power and auth not yet implemented)
-
-#todo: add parameters to get_temp so that this norm can be checked as a predicate
-#norm(commitment, COM1, glider55, shenrie, (negotiate_resource,shenrie,glider55), (norm,(commitment,COM3,(get_temp,shenrie,glider55,(a,b)),get_temp)))
-norm(commitment, COM1, glider55, shenrie, (negotiate_resource,shenrie,glider55,"{\'duration\': 5}"), (norm,(commitment,COM3,(get_temp,shenrie,glider55,"{}"),get_temp)))
-belief(stative, COM2, commitment, cancelled)
-
-#ORG DEFINITION (USER)
-##norm(power, POW6, shenrie,DONTCARE,resource_request,permit)
-##norm(power, POW7, mmeisinger,DONTCARE,resource_request,permit)
-##norm(power, POW8, mmeisinger,DONTCARE,org_request,permit)
-##norm(power, POW9, shenrie,DONTCARE,org_request,permit)
-norm(sanction, SAN1, shenrie, glider55, (violated_commitment,COM3), (escalate,shenrie,SCILAB,(sanction,SAN1,mmeisinger)))
-
-#ORG DEFINITION (USER)
-norm(authorization, AUTH6, shenrie, DONTCARE, sanction, permit)
-norm(authorization, AUTH7, mmeisinger,DONTCARE,contribute,permit)
-norm(authorization, AUTH8, shenrie,DONTCARE,enroll,permit)
-norm(authorization, AUTH9, mmeisinger,DONTCARE,enroll,permit)
-norm(authorization, AUTH10, shenrie,DONTCARE,resource_request,permit)
-norm(authorization, AUTH11, mmeisinger,DONTCARE,org_request,permit)
-norm(authorization, AUTH12, shenrie,DONTCARE,org_request,permit)
-norm(authorization, AUTH13, mmeisinger,DONTCARE,resource_request,permit)
-norm(authorization, AUTH14, shenrie, glider55, negotiate_resource, permit)
-norm(authorization, AUTH15, shenrie, glider55, get_temp, permit)
+#authorizations for the org
+norm(authorization, AUTH2, SCILAB, shenrie, true, enroll)
+#things the org_agent is obligated for
+norm(commitment, COM2, SCILAB, shenrie, (request,enroll, shenrie,SCILAB, (student)), (enroll,shenrie,SCILAB,(student)))
