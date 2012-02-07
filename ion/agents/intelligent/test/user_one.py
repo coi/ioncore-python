@@ -38,25 +38,25 @@ class UserOne(ServiceProcess):
 
     @defer.inlineCallbacks
     def send_request(self, op='resource_request', user_id='shenrie', resource_id='glider56', content=None):
+        response=None
         try:
             uasc = UserAgentServiceClient(proc=self)
             #header for the user agent
             headers={'op':op,'user-id':user_id, 'receiver-name':resource_id,'content' : content, 'agent-op':op}
-            log.info('requesting '+str(headers))
             response  = yield uasc.request(op, headers)
-            log.info('response: '+str(response))
         except Exception as exception:
             log.error(exception)
 
+        defer.returnValue(response)
 
     def enroll(self, user_id='shenrie', resource_id = 'SCILAB', action='enroll', role='student', op='org_request'):
         content=(action,user_id,resource_id,(role))
-        log.info(content)
-        self.send_request(op, user_id, user_id, content)
+        response=self.send_request(op, user_id, user_id, content)
+        response.addCallbacks(self.print_response)
 
-
-
-
+    def print_response(self,response):
+        log.info('I am saying the response is: ')
+        log.info(response)
 
 
 

@@ -34,20 +34,17 @@ class OrgAgentService(AgentServiceProcess):
         log.info('OrgAgentService.__init__()')
 
 
-    @defer.inlineCallbacks
+    #@defer.inlineCallbacks
     def enroll(self, content, headers, msg, user_id, org, role):
-
+        responses=[]
         try:
             role=role[0]
-            log.info('enrolling ' + user_id + ' in org '+ org + ' as '+ role)
-            response=('enroll',(user_id,org,(role)))
-
-            
+            responses.append(('enroll',(user_id,org,(role))))
         except Exception as exception:
             log.error(exception)
-            response=None
-
-        yield self.reply_ok(msg, response, {})
+            responses=None
+        return responses
+        #yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
     def op_sanction(self, content, headers, msg):

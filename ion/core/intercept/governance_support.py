@@ -9,7 +9,6 @@ log = ion.util.ionlog.getLogger(__name__)
 from pyke import knowledge_engine
 from pyke import *
 from twisted.internet import defer
-from collections import deque
 
 DROP='drop'
 
@@ -42,23 +41,23 @@ class GovernanceSupport():
         if self.agent == 'org_agent' or self.agent=='resource_agent' or self.agent=='user_agent':
             try:
 
-                #log.info('##### updating agent belief to reflect that request was made ')
+                #log.info('updating agent belief to reflect that request was made ')
                 self.store(self.agent+'_facts','request', (op, requester, servicer, headers['content']))
-                log.debug('##### '+self.agent + ' checking ' +requester  +' for .authorization($id,'+requester+','+servicer+',$antecedent,'+op+')')
+                log.debug(self.agent + ' checking ' +requester  +' for .authorization($id,'+requester+','+servicer+',$antecedent,'+op+')')
                 vars, plan = self.my_engine.prove_1_goal(self.agent+'.authorization($id,'+requester+','+servicer+',$antecedent,'+op+')')
                 antecedent=vars['antecedent']
                 id=vars['id']
-                log.info('##### '+'in norm '+id + ' antecedent '+antecedent +' is true thus authorizing '+requester+' to perform ' + op + ' on '+ servicer)
+                log.info('in norm '+id + ' antecedent '+antecedent +' is true thus authorizing '+requester+' to perform ' + op + ' on '+ servicer)
 
             except Exception as exception:
                 log.debug(exception)
                 antecedent = DROP
-                log.info('##### no authorization')
+                log.info('no authorization')
 
         return antecedent
 
     def check_detached_commitments(self,headers):
-        consequents = deque()
+        consequents = []
         log.info('headers: ' + str(headers))
         if 'receiver-name' in headers:
             servicer = headers['receiver-name']
@@ -66,10 +65,9 @@ class GovernanceSupport():
             return 'inapplicable'
 
         requester=headers['user-id']
-        consequent='null'
         if self.agent == 'org_agent' or self.agent=='resource_agent' or self.agent=='user_agent':
             try:
-                log.debug('##### '+self.agent + ' checking ' +servicer +' for .detached_commitment($id,'+servicer+','+requester+',$antecedent,$consequent) to ' + requester)
+                log.debug(self.agent + ' checking ' +servicer +' for .detached_commitment($id,'+servicer+','+requester+',$antecedent,$consequent) to ' + requester)
                 with self.my_engine.prove_goal(self.agent+'.detached_commitment($id,'+servicer+','+requester+',$antecedent,$consequent)') as gen:
                     for vars, plan in gen:
                         #vars, plan = my_engine.prove_1_goal(self.agent+'.authorization($id,'+user_id+','+resource_id+','+op+',$response)')
@@ -77,20 +75,18 @@ class GovernanceSupport():
                         consequents.append(consequent)
                         id=vars['id']
                         antecedent=vars['antecedent']
-                        log.info('##### '+id + ' commits '+servicer+'\'s agent to do ' + str(consequent) +' if '+ requester+'\'s agent does '+ str(antecedent))
-                    log.info('all obligations found '+str(consequent))
-
+                        log.info(id + ' commits '+servicer+'\'s agent to do ' + str(consequent) +' if '+ requester+'\'s agent does '+ str(antecedent))
             except Exception as exception:
                 log.debug(exception)
                 consequents.append(DROP)
-                log.info('##### no commitments')
+                log.info('no commitments')
 
-        #return consequents
-        return consequent
+        return consequents
+
 
 
     def check_pending_sanctions(self,headers):
-        consequents=deque()
+        consequents=[]
         log.info('check pending sanctions headers: ' + str(headers) +' in '+self.agent)
         if 'receiver-name' in headers:
             resource_id = headers['receiver-name']
@@ -102,17 +98,17 @@ class GovernanceSupport():
         consequent='null'
         if self.agent == 'org_agent' or self.agent=='resource_agent' or self.agent=='user_agent':
             try:
-                log.debug('##### '+self.agent + ' checking ' +resource_id +' for .pending_sanction($id,'+user_id+','+resource_id+',$antecedent,$consequent) to ' + user_id)
+                log.debug(self.agent + ' checking ' +resource_id +' for .pending_sanction($id,'+user_id+','+resource_id+',$antecedent,$consequent) to ' + user_id)
                 with self.my_engine.prove_goal(self.agent+'.pending_sanction($id,'+user_id+',$creditor,$antecedent,$consequent)') as gen:
                     for var, plan in gen:
                         consequents.append(vars['consequent'])
                         id=vars['id']
                         antecedent=vars['antecedent']
-                        log.info('##### '+id + ' requires '+resource_id+'\'s agent to carry out sanction ' + str(consequent) +' since '+ user_id+'\'s agent '+ str(antecedent))
+                        log.info(id + ' requires '+resource_id+'\'s agent to carry out sanction ' + str(consequent) +' since '+ user_id+'\'s agent '+ str(antecedent))
             except Exception as exception:
                 log.debug(exception)
                 consequents.append(DROP)
-                log.info('##### no commitments')
+                log.info('no commitments')
 
         return consequents
 

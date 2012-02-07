@@ -8,17 +8,18 @@
 #
 
 # it is a pending norm if antecedent is satisfied but consequent is not
+
 pending_norm
 	use pending_norm($norm_type,$id,$debtor,$creditor,$antecedent,$consequent)
 	when
-	    python print 'checking pending_norm ',$norm_type
+	    #python print 'checking pending_norm ',$norm_type
 	    org_agent_facts.norm($norm_type, $id, $debtor,$creditor,$antecedent,$consequent)
-	    python print 'checking pending_norm ',$norm_type,$id, $debtor,$creditor,$antecedent,$consequent
+	    #python print 'checking pending_norm ',$norm_type,$id, $debtor,$creditor,$antecedent,$consequent
 	    condition($antecedent)
 	    notany
-	        python print 'checking notany consequent is true ',$consequent
+	        #python print 'checking notany consequent is true ',$consequent
 	        condition($consequent)
-	        python print 'notany consequent is true ',$consequent
+	        #python print 'notany consequent is true ',$consequent
 
 # it is a satisified commitment if consequent is satisified
 satisfied_commitment
@@ -31,7 +32,7 @@ satisfied_commitment
 violated_commitment_short_form
 	use violated_commitment($id)
 	when
-	    python print 'checking violated commitment short form ',$id
+	    #python print 'checking violated commitment short form ',$id
 	    detached_commitment($id,$creditor,$debtor,$antecedent,$consequent)
 	    #pending_norm(commitment,$id,$_creditor,$_debtor,$_antecedent,$_consequent)
 
@@ -39,16 +40,14 @@ violated_commitment_short_form
 violated_commitment
 	use violated_commitment($id,$debtor,$creditor,$antecedent,$consequent)
 	when
-	    python print 'violated commitment long form'
+	    #python print 'violated commitment long form'
 	    detached_commitment($id,$creditor,$debtor,$antecedent,$consequent)
-
 
 # it is a pending commitment if antecedent is satisfied but consequent is not and
 # we are looking at it from the perspective of the debtor
 detached_commitment
 	use detached_commitment($id,$debtor,$creditor,$antecedent,$consequent)
 	when
-	    python print 'checking detached commitment ',$id
 	    pending_norm(commitment,$id,$debtor,$creditor,$antecedent,$consequent)
 
 # it is a pending sanction if antecedent is satisfied but consequent is not
@@ -126,13 +125,13 @@ serviceinstances
 condition_event
 	use condition($a)
 	when
-	    python print 'condition event', $a
+	    #python print 'condition event', $a
 	    org_agent_facts.event($a)
 
 condition_parenthetical_event
 	use condition(($a))
 	when
-	    python print 'condition parenthetical event', $a
+	    #python print 'condition parenthetical event', $a
 	    org_agent_facts.event($a)
 
 condition_true
@@ -143,7 +142,7 @@ condition_true
 condition_stative
 	use condition($a)
 	when
-	    python print 'condition statives', $a
+	    #python print 'condition statives', $a
 	    check len($a) == 5
 	    python 'check stative length',$a,len($a)
 	    python state,debtor,creditor,antecedent,consequent=$a
@@ -159,7 +158,7 @@ condition_stative
 condition_request
 	use condition($a)
 	when
-	    python print 'check request length',$a,len($a)
+	    #python print 'check request length',$a,len($a)
 	    check len($a) == 5
 	    python 'check req length',$a,len($a)
 	    python request,op,requester,servicer,parameters=$a
@@ -175,7 +174,7 @@ condition_request
 predicate_exists
     use condition($a)
     when
-        python print 'check predicate length',$a,len($a)
+        #python print 'check predicate length',$a,len($a)
         check len($a) == 4
         python op,requester,servicer,arguments=$a
         #$data=data
@@ -191,12 +190,12 @@ predicate_exists
 condition_norm_state
 	use condition($a)
 	when
-	    python print 'check norm state',$a,len($a)
+	    #python print 'check norm state',$a,len($a)
 	    check len($a) == 2
 	    python state,norm_id=$a
 	    $state=state
 	    $norm_id=norm_id
-	    python print 'checking state ',$state,$norm_id
+	    #python print 'checking state ',$state,$norm_id
 	    $state($norm_id)
 
 
@@ -218,7 +217,7 @@ condition_norm_state
 condition_norm
     use condition($a)
     when
-        python print 'checking condition norm ', $a
+        #python print 'checking condition norm ', $a
         check len($a)==2
         python norm,parameter=$a
         $norm=norm
@@ -226,7 +225,7 @@ condition_norm
         python norm_type,id,antecedent,consequent=$parameter
         $norm_type=norm_type
         $id=id
-        python print 'checking norm',$norm_type,$id
+        #python print 'checking norm',$norm_type,$id
         org_agent_facts.norm($norm_type,$id,$_debtor,$_creditor,$_antecedent,$_consequent)
 
 
@@ -284,6 +283,3 @@ or_condition_base_parenthetical_b
 ##
 ##CONDITIONS
 ##
-
-
-

@@ -8,9 +8,9 @@ norm(authorization, AUTH1, shenrie, shenrie, true, org_request)
 
 #things the simulated user is obligated for
 #if shenrie requests an 'org_request' then do an org_request
-norm(commitment, COM1, shenrie, shenrie, (request,org_request,shenrie,shenrie,(enroll,shenrie,SCILAB,((student)))), (org_request,shenrie,SCILAB,(enroll,(student))))
+norm(commitment, COM1, shenrie, shenrie, (request,org_request,shenrie,shenrie,(enroll,shenrie,SCILAB,((student,)))), (org_request,shenrie,SCILAB,(enroll,(student,))))
 
 #authorizations for the org
-norm(authorization, AUTH2, SCILAB, shenrie, true, enroll)
+norm(authorization, AUTH2, shenrie, SCILAB, true, enroll)
 #things the org_agent is obligated for
-norm(commitment, COM2, SCILAB, shenrie, (request,enroll, shenrie,SCILAB, (student)), (enroll,shenrie,SCILAB,(student)))
+norm(commitment, COM2, SCILAB, shenrie, (request,enroll,shenrie,SCILAB,(student,)), (enroll,shenrie,SCILAB,(student,)))

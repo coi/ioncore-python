@@ -34,31 +34,40 @@ class UserAgentService(AgentServiceProcess):
         AgentServiceProcess.__init__(self, *args, **kwargs)
         log.info('UserAgentService.__init__()')
 
-
-
-
     @defer.inlineCallbacks
-    def op_org_request(self, content, headers, msg,requester,servicer,parameters):
-
+    def org_request(self, content, headers, msg,requester,servicer,parameters):
         #(parameters=(enroll,(student))))
         op,parameters=parameters
         #todo take off the op parameter below
         headers={'op':op,'agent-op':op,'user-id':requester,'receiver-name':servicer,'content':parameters}
-
+        responses=[]
         try:
             oasc = OrgAgentServiceClient()
             # response returned should be (enroll,(shenrie,SCILAB,student))
+            #response = yield oasc.request(op,headers)
             response = yield oasc.request(op,headers)
+            responses.extend(response)
+            responses.append(('org_request',('shenrie','SCILAB',('enroll',('student',)))))
         except Exception as exception:
             #if org agent does not respond, store the fact
             #response={'belief':'refused','consequent':[op,[headers['user-id'], content['receiver-name'], str(content['content'])]]}
-            response=None
-
-        yield response
-
+            log.error(exception)
+            responses=None
+        defer.returnValue(responses)
+        #return responses
 
     @defer.inlineCallbacks
-    def op_resource_request(self, content, headers, msg, parameters):
+    def say_hi(self, content, headers, msg,requester,servicer,parameters):
+        #(parameters=(prashant)
+        responses=[]
+        log.info('Hi ' + parameters)
+        responses.append(('say_hi',('shenrie','SCILAB',('prashant',))))
+
+        defer.returnValue(responses)
+        #return responses
+
+    @defer.inlineCallbacks
+    def resource_request(self, content, headers, msg, parameters):
 
         #generate header for the message to the resource agent
         op=content['agent-op']
@@ -96,7 +105,23 @@ class UserAgentService(AgentServiceProcess):
 
         yield self.reply_ok(msg, response, {})
 
-
+    @defer.inlineCallbacks
+    def escalate(self,content,headers,msg,parameters):
+        creditor,debtor,parameters=parameters
+        op=parameters[0]
+        #override the content with headers information because op_org_request will inspect
+        #the content and form a header out of it
+        headers={'receiver-name':debtor, 'op':op, 'content':parameters, 'user-id':creditor}
+        response=None
+        try:
+            oasc = OrgAgentServiceClient()
+            #response = yield oasc.request(op,headers)
+            response = oasc.request(op,headers)
+        except Exception as exception:
+            log.error(exception)
+            log.error('SEVERE ERROR; Failed to escalate ' + str(parameters))
+        log.info('returning response '+str(response))
+        return response
 
 
 
@@ -112,11 +137,12 @@ class UserAgentServiceClient(AgentServiceClient):
 
     @defer.inlineCallbacks
     def request(self, op, headers=None):
+
         yield self._check_init()
         (content, headers, msg) = yield self.rpc_send(op,headers['content'],headers)
         defer.returnValue(content)
         
-    
+
     def request_deferred(self, request=None):
         return self.rpc_send('service_request', request)
 

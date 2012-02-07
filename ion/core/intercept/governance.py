@@ -20,10 +20,6 @@ class GovernanceInterceptor(EnvelopeInterceptor):
 
     def before(self, invocation):
 
-        headers=invocation.content
-        
-        if 'receiver-name' in headers:
-            log.info('Governance before '+str(headers))
 
         if hasattr(invocation.process,'governance_support'):
             log.debug('Governance Interceptor invoked')

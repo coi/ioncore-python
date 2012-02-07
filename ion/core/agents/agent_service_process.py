@@ -14,8 +14,7 @@ from twisted.internet import defer
 
 from ion.core.process.service_process import ServiceProcess, ServiceClient
 from ion.core.intercept.governance_support import GovernanceSupport
-from collections import deque
-
+from ion.core.intercept.policy_support import PolicySupport
 
 class AgentServiceProcess(ServiceProcess):
 
@@ -26,30 +25,34 @@ class AgentServiceProcess(ServiceProcess):
             self.AGENT_NAME==(self.__name__).rsplit('.',1)[1]
             log.warn('using '+self.AGENT_NAME+' instead')
         self.governance_support = GovernanceSupport(self.AGENT_NAME)
+        self.policy_support=PolicySupport()
 
-    #@defer.inlinecallbacks
+
+
+
+    @defer.inlineCallbacks
     def op_process_request(self,content,headers,msg):
+        #self.reply_ok(msg, 'LATER ALLIGATOR', {})
 
-        log.info('storing received request')
-        response_queue = deque()
-    
-        log.info('performing obligations')
-        response_queue.append(self.perform_obligations(content, headers, msg))
+        responses = []
+        if headers['performative']!='request':
+            log.info(headers['performative'])
+        else:
+            responses=yield self.perform_obligations(content, headers, msg)
+            log.info(self.AGENT_NAME +': applying sanctions')
+            #results=yield self.apply_sanctions(content, headers, msg)
+            #responses.extend(results)
+            #yield self.reply_ok(msg, responses, {})
+            log.info(self.AGENT_NAME + ': returning '+str(responses))
+        self.reply_ok(msg, responses, {})
+        #defer.returnValue(responses)
 
-        log.info('applying sanctions')
-        #response_queue.append(self.apply_sanctions(content, headers, msg))
-
-        return response_queue
-
-    #@defer.inlineCallbacks
+    @defer.inlineCallbacks
     def perform_obligations(self, content, headers, msg):
 
-
-        response_queue = deque()
+        responses = []
         try:
             consequents=self.governance_support.check_detached_commitments(headers)
-            log.debug('consequents from detached commitment are :')
-            log.debug(str(consequents))
             for consequent in consequents:
                 #for parameterized consequents
                 if len(consequent)==4:
@@ -59,30 +62,76 @@ class AgentServiceProcess(ServiceProcess):
                     op=consequent
                     parameters=None
                 else :
-                    log.error('Error in the way consequent has been declared '+str(len(consequent)))
-                    if op == None:
-                        log.error('Error in the way consequent has been declared'+str(consequent))
-                    if op != None:
-                        response=getattr(self, op)(content, headers, msg, requester,servicer,parameters)
-                    if response != None:
-                        self.store(response)
-                    if response != None:
-                        response_queue.append(response)
+                    log.error(self.AGENT_NAME +': Error in the way consequent has been declared '+consequent+ ' its length is '+str(len(consequent)))
+
+                if op == None:
+                    log.error(self.AGENT_NAME +': Error in the way consequent has been declared'+str(consequent))
+                if op != None:
+                    #expects a list of results
+                    results = yield getattr(self, op)(content, headers, msg, requester,servicer,parameters)
+                    log.info(self.AGENT_NAME+' response '+str(results))
+                if results != None:
+                    for result in results:
+                        try:
+                            predicate,parameters=result
+                            self.store(predicate,parameters)
+                        except Exception as exception:
+                            log.error(exception)
+
+                    responses.extend(results)
+            log.info(self.AGENT_NAME +': No more obligations')
         except Exception as exception:
                 log.debug(exception)
-                response_queue.append(exception)
+                responses.append(exception)
+        defer.returnValue(responses)
 
-        #return self.reply_ok(msg, response_queue, {})
-        return response_queue
 
-    def apply_sanctions(self, content, headers, msg):
+    @defer.inlineCallbacks
+    def perform_sanctions(self, content, headers, msg):
+
+        responses = []
+        try:
+            consequents=self.governance_support.check_pending_sanctions(headers)
+            for consequent in consequents:
+                #for parameterized consequents
+                if len(consequent)==4:
+                    op,requester,servicer,parameters=consequent
+                elif len(consequent)==1 :
+                    #non parameterized consequents
+                    op=consequent
+                    parameters=None
+                else :
+                    log.error(self.AGENT_NAME +': Error in the way consequent has been declared '+consequent+ ' its length is '+str(len(consequent)))
+
+                if op == None:
+                    log.error(self.AGENT_NAME +': Error in the way consequent has been declared'+str(consequent))
+                if op != None:
+                    #expects a list of results
+                    results = yield getattr(self, op)(content, headers, msg, requester,servicer,parameters)
+                    log.info(self.AGENT_NAME+' response '+str(results))
+                if results != None:
+                    for result in results:
+                        try:
+                            predicate,parameters=result
+                            self.store(predicate,parameters)
+                        except Exception as exception:
+                            log.error(exception)
+
+                    responses.extend(results)
+            log.info(self.AGENT_NAME +': No more sanctions')
+        except Exception as exception:
+                log.debug(exception)
+                responses.append(exception)
+        defer.returnValue(responses)
+
+    def apply_sanctionss(self, content, headers, msg):
         #check for pending_sanctions
-        log.info('checking for sanctions')
-        response_queue = deque()
+        log.info(self.AGENT_NAME +': checking for sanctions')
+        responses = None
         try:
             #consequent example: ('make_request', 'escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1'))
             consequents= self.governance_support.check_pending_sanctions(headers)
-            log.debug('consequents of applicable sanctions are '+str(consequents))
+            log.debug(self.AGENT_NAME +': consequents of applicable sanctions are '+str(consequents))
             for consequent in consequents:
                 if len(consequent)==4:
                     #assumes sanction have consequent that have an operation to be issued by creditor to debtor with parameters
@@ -93,19 +142,19 @@ class AgentServiceProcess(ServiceProcess):
                     op=consequent
                     parameters=None
                 else :
-                    op==None
-                    log.error('Error in the way consequent has been declared'+str(consequent))
-                if op!=None:
+                    op == None
+                    log.error(self.AGENT_NAME +': Error in the way consequent has been declared'+str(consequent))
+                if op != None:
                     #perform the operation op
                     response=getattr(self, op)(content, headers, msg, parameters)
-                if response !=None:
+                if response != None:
                     self.store(response)
-                response_queue.append(response)
+                responses.append(response)
         except Exception as exception:
                 log.debug(exception)
-                response_queue.append(exception)
+                responses.append(exception)
 
-        return self.reply_ok(msg, response_queue, {})
+        return self.reply_ok(msg, responses, {})
 
     #sometimes the consequent may simply be creation of another norm
     def norm(self,content,headers,msg,parameters):
@@ -120,25 +169,10 @@ class AgentServiceProcess(ServiceProcess):
             response=['norm',norm]
         except Exception as exception:
             log.debug(exception)
-            log.error('SEVERE ERROR; Failed to create norm ' + str(parameters))
+            log.error(self.AGENT_NAME +': SEVERE ERROR; Failed to create norm ' + str(parameters))
         return response
 
-    #@defer.inlineCallbacks
-    def escalate(self,content,headers,msg,parameters):
-        creditor,debtor,parameters=parameters
-        op=parameters[0]
-        #override the content with headers information because op_org_request will inspect
-        #the content and form a header out of it
-        headers={'receiver-name':debtor, 'op':op, 'content':parameters, 'user-id':creditor}
-        response=None
-        try:
-            oasc = OrgAgentServiceClient()
-            #response = yield oasc.request(op,headers)
-            response = oasc.request(op,headers)
-        except Exception as exception:
-            log.error(exception)
-            log.error('SEVERE ERROR; Failed to escalate ' + str(parameters))
-        return response
+    
 
 
     def store(self,fact_name,arguments):
@@ -164,5 +198,5 @@ class AgentServiceClient(ServiceClient):
 
 
     def rpc_send(self, op, content,headers=None):
-        log.debug('this rpc_send is called')
         return ServiceClient.rpc_send(self,'process_request',content,headers)
+
