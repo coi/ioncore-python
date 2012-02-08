@@ -37,27 +37,51 @@ class UserOne(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def send_request(self, user_id='shenrie', resource_id='glider56', action='get_temp',op='resource_request',content={}):
-        uasc = UserAgentServiceClient(proc=self)
-        #header for the user agent
-        headers={'user-id':user_id, 'content' : {'receiver-name':resource_id,'op':action, 'content':content}, 'receiver-name':user_id}
-        response  = yield uasc.request(op, headers)
-        log.info('response: '+str(response))
+    def send_request(self, op='resource_request', user_id='shenrie', resource_id='glider56', content=None):
+        response=None
+        try:
+            uasc = UserAgentServiceClient(proc=self)
+            #header for the user agent
+            headers={'op':op,'user-id':user_id, 'receiver-name':resource_id,'content' : content, 'agent-op':op}
+            response  = yield uasc.request(op, headers)
+        except Exception as exception:
+            log.error(exception)
 
-    def request_resource(self, negotiated_time='00:00:00.000-08:00', user_id='shenrie', resource_id='glider55', action='get_temp', op='resource_request'):
-        log.info('authorized user requests '+ action +' on '+resource_id)
-        self.send_request(user_id, resource_id, action, op)
-
-    def negotiate_resource(self, user_id='shenrie', resource_id='glider55', duration=5, action='negotiate_resource', op='resource_request'):
-         log.info('authorized user does '+ action +' on '+resource_id+ ' for a duration of '+str(duration)+' hrs')
-         self.send_request(user_id, resource_id, action, op, {'duration':duration})
+        defer.returnValue(response)
 
     def enroll(self, user_id='shenrie', resource_id = 'SCILAB', action='enroll', role='student', op='org_request'):
-        self.send_request(user_id, resource_id, action, op, {'role':role})
+        content=(action,user_id,resource_id,(role,))
+        response=self.send_request(op, user_id, user_id, content)
+        response.addCallbacks(self.print_response)
+
+    def press_button(self, user_id='shenrie', resource_id = 'SCILAB', action='press_button', role='student', op='press_button'):
+        content=('true',)
+        response=self.send_request(op, user_id, user_id, content)
+        response.addCallbacks(self.print_response)
+
+    def print_response(self,response):
+        log.info(response)
+
+
+
+
+
+
+
+
+    def request_resource(self, negotiated_time='00:00:00.000-08:00', user_id='shenrie', resource_id='glider55', action='get_temp', op='resource_request'):
+       log.info('authorized user requests '+ action +' on '+resource_id)
+       self.send_request(user_id, resource_id, action, op)
+
+    def negotiate_resource(self, user_id='shenrie', resource_id='glider55', duration=5, action='negotiate_resource', op='resource_request'):
+        log.info('authorized user does '+ action +' on '+resource_id+ ' for a duration of '+str(duration)+' hrs')
+        self.send_request(user_id, resource_id, action, op, {'duration':duration})
+
 
     def list_resources(self, resource_id = 'SCILAB', user_id='shenrie', action='list_resources', op='org_request'):
         log.info('user requests list of resources from ' + resource_id)
-        self.send_request(user_id, resource_id, action, op)
+        self.send_request(user_id, resource_id, op,(action))
+
 
     def list_users(self,  resource_id = 'SCILAB', user_id='shenrie', action='list_users', op='org_request'):
         log.info('user requests list of resources from ' + resource_id)

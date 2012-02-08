@@ -1,4 +1,4 @@
-# $Id: useragent.krb 2011-12-06 pckediya $
+# $Id: user_agent.krb 2011-12-06 pckediya $
 #
 #
 #
@@ -8,17 +8,18 @@
 #
 
 # it is a pending norm if antecedent is satisfied but consequent is not
+
 pending_norm
 	use pending_norm($norm_type,$id,$debtor,$creditor,$antecedent,$consequent)
 	when
-	    python print 'checking pending_norm ',$norm_type
+	    #python print 'checking pending_norm ',$norm_type
 	    user_agent_facts.norm($norm_type, $id, $debtor,$creditor,$antecedent,$consequent)
-	    python print 'checking pending_norm ',$norm_type,$id, $debtor,$creditor,$antecedent,$consequent
+	    #python print 'checking pending_norm ',$norm_type,$id, $debtor,$creditor,$antecedent,$consequent
 	    condition($antecedent)
 	    notany
-	        python print 'checking notany consequent is true ',$consequent
+	        #python print 'checking notany consequent is true ',$consequent
 	        condition($consequent)
-	        python print 'notany consequent is true ',$consequent
+	        #python print 'notany consequent is true ',$consequent
 
 # it is a satisified commitment if consequent is satisified
 satisfied_commitment
@@ -31,7 +32,7 @@ satisfied_commitment
 violated_commitment_short_form
 	use violated_commitment($id)
 	when
-	    python print 'checking violated commitment short form ',$id
+	    #python print 'checking violated commitment short form ',$id
 	    detached_commitment($id,$creditor,$debtor,$antecedent,$consequent)
 	    #pending_norm(commitment,$id,$_creditor,$_debtor,$_antecedent,$_consequent)
 
@@ -39,16 +40,14 @@ violated_commitment_short_form
 violated_commitment
 	use violated_commitment($id,$debtor,$creditor,$antecedent,$consequent)
 	when
-	    python print 'violated commitment long form'
+	    #python print 'violated commitment long form'
 	    detached_commitment($id,$creditor,$debtor,$antecedent,$consequent)
-
 
 # it is a pending commitment if antecedent is satisfied but consequent is not and
 # we are looking at it from the perspective of the debtor
 detached_commitment
 	use detached_commitment($id,$debtor,$creditor,$antecedent,$consequent)
 	when
-	    python print 'checking detached commitment ',$id
 	    pending_norm(commitment,$id,$debtor,$creditor,$antecedent,$consequent)
 
 # it is a pending sanction if antecedent is satisfied but consequent is not
@@ -77,7 +76,8 @@ power_dontcare
 authorization
     use authorization($id, $debtor, $creditor, $antecedent, $consequent)
     when
-        user_agent_facts.norm('authorization',$id, $debtor,$creditor,$antecedent,$consequent)
+        pending_norm('authorization',$id, $debtor,$creditor,$antecedent,$consequent)
+
 
 authorization_dontcare
     use authorization($id, $debtor, $creditor, $antecedent, $consequent)
@@ -125,19 +125,24 @@ serviceinstances
 condition_event
 	use condition($a)
 	when
-	    python print 'condition event', $a
 	    user_agent_facts.event($a)
+	    python print '################### this never gets invoked: condition event', $a
 
 condition_parenthetical_event
 	use condition(($a))
 	when
-	    python print 'condition parenthetical event', $a
 	    user_agent_facts.event($a)
+	    python print '################### this never gets invoked: condition parenthetical event', $a
+
+condition_true
+	use condition($a)
+	when
+	    check $a=='true'
 
 condition_stative
 	use condition($a)
 	when
-	    python print 'condition statives', $a
+	    #python print 'condition statives', $a
 	    check len($a) == 5
 	    python 'check stative length',$a,len($a)
 	    python state,debtor,creditor,antecedent,consequent=$a
@@ -148,47 +153,50 @@ condition_stative
 	    $consequent=consequent
 	    user_agent_facts.stative($state,$debtor,$creditor,$antecedent,$consequent)
 
-#example value of $a: ('request', 'get_temp', 'shenrie', 'glider55')
-#request example in knowledge_base request('negotiate_resource', 'shenrie', 'glider55', {'duration': 5})
+#example value of $a: ('request', 'get_temp', 'shenrie', 'glider55', ('1200hrs'))
+#request example in knowledge_base request('get_temp', 'shenrie', 'glider55', ('1200hrs'))
 condition_request
 	use condition($a)
 	when
-	    python print 'check request length',$a,len($a)
-	    check len($a) == 4
+	    check len($a) == 5
 	    python 'check req length',$a,len($a)
-	    python request,request_type,requester,servicer=$a
+	    python request,op,requester,servicer,parameters=$a
 	    $request=request
-	    $request_type=request_type
+	    $op=op
 	    $requester=requester
 	    $servicer=servicer
-	    #$parameter=parameter
-	    user_agent_facts.$request($request_type,$requester,$servicer,$parameter)
+	    $parameters=parameters
+	    python print 'checking request: ',$request,$op,$requester,$servicer,$parameters
+	    user_agent_facts.request($request_type,$requester,$servicer,$parameters)
+
 
 #example value of $a: ('escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
 #example value in knowledge base:escalate( 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
 predicate_exists
     use condition($a)
     when
-        python print 'check predicate length',$a,len($a)
         check len($a) == 4
-        python op,servicer,requester,arguments=$a
+        python op,requester,servicer,arguments=$a
         #$data=data
-        #python op,servicer,requester,arguments=$data
+        #python op,requester,servicer,arguments=$data
         $op=op
-        $servicer=servicer
         $requester=requester
+        $servicer=servicer
         $arguments=arguments
-        user_agent_facts.$op($servicer,$requester,$arguments)
+        python print 'checking predicate ',$op,$requester,$servicer,$arguments
+        user_agent_facts.$op($requester,$servicer,$arguments)
+
+
 
 condition_norm_state
 	use condition($a)
 	when
-	    python print 'check norm state',$a,len($a)
+	    #python print 'check norm state',$a,len($a)
 	    check len($a) == 2
 	    python state,norm_id=$a
 	    $state=state
 	    $norm_id=norm_id
-	    python print 'checking state ',$state,$norm_id
+	    #python print 'checking state ',$state,$norm_id
 	    $state($norm_id)
 
 
@@ -210,7 +218,7 @@ condition_norm_state
 condition_norm
     use condition($a)
     when
-        python print 'checking condition norm ', $a
+        #python print 'checking condition norm ', $a
         check len($a)==2
         python norm,parameter=$a
         $norm=norm
@@ -218,7 +226,7 @@ condition_norm
         python norm_type,id,antecedent,consequent=$parameter
         $norm_type=norm_type
         $id=id
-        python print 'checking norm',$norm_type,$id
+        #python print 'checking norm',$norm_type,$id
         user_agent_facts.norm($norm_type,$id,$_debtor,$_creditor,$_antecedent,$_consequent)
 
 
@@ -235,13 +243,19 @@ condition_norm
 and_condition_event_base_case
 	use condition($a,AND,$b)
 	when
+		python print 'checking first and condition ',$a
 		condition($a)
+		python print 'checking second and condition ',$b
 		condition($b)
+		python print 'checked second and condition '
 and_condition_event_parenthetical_base_case
 	use condition(($a,AND,$b))
 	when
+		python print 'checking first () and condition ',$a
 		condition($a)
+		python print 'checking second () and condition ',$b
 		condition($b)
+		python print 'checked second () and condition '
 ####
 ####AND CONDITIONS
 ####

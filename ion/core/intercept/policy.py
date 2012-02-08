@@ -31,7 +31,7 @@ from ion.core.messaging.message_client import MessageClient
 
 from google.protobuf.internal.containers import RepeatedScalarFieldContainer
 
-from ion.core.xacml import request
+from ion.core.intercept.policy_support import PolicySupport
 from ndg.xacml.core.context.result import Decision
 
 CONF = ioninit.config(__name__)
@@ -328,31 +328,9 @@ class PolicyInterceptor(EnvelopeInterceptor):
 
     @defer.inlineCallbacks
     def check_policies(self,invocation):
-        requestCtx = request._createRequestCtx(invocation)
-        if requestCtx is None:
-            log.debug('requestCtx is empty')
-            invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
-        else:
-            log.debug('request context created')
-            pdp = request._createPDP()
-            log.debug('pdp created')
-            response = pdp.evaluate(requestCtx)
-            log.debug('pdp evaluated response')
-            if response is None:
-                log.debug('response from PDP contains nothing')
-                invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
-            else:
-                for result in response.results:
-                    if str(result.decision) == Decision.DENY_STR:
-                        break
-                if str(result.decision) == Decision.DENY_STR:
-                    log.info('Policy Interceptor: Returning Not Authorized.')
-                    invocation.drop(note='Not authorized', code=Invocation.CODE_UNAUTHORIZED)
-                else:
-                    log.info('Policy Interceptor: Returning Authorized.')
-            log.info('XACML Policy Interceptor permission: '+str(result.decision))
-            defer.returnValue(invocation)
-        yield (1,)
+        if hasattr(invocation.process,'policy_support'):
+            invocation= yield invocation.process.policy_support.check_policies(invocation)
+        defer.returnValue(invocation)
 
     @defer.inlineCallbacks
     def check_owner(self, user_id, uuid_list, invocation):

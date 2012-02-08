@@ -53,13 +53,13 @@ def _createRequestCtx(invocation):
 
     subject_id=headers['user-id']
     resource_id=headers['receiver-name']
-    action_id=headers['op']
+    action_id=headers['agent-op']
 
     #calculate the following
     org='ooi'
     subjectRoles=['researcher']
 
-    print subject_id + " - " + org + " - "+ str(subjectRoles)+" - "+resource_id+" - "+action_id
+    log.info(subject_id + " - " + org + " - "+ str(subjectRoles)+" - "+resource_id+" - "+action_id)
     #agent_id=msg['receiver'].split(".")[1]
     #subject_id_qualifier=agent
     #agent_type = msg['receiver'].rsplit('.',1)[-1]

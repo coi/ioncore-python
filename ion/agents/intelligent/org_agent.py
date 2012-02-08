@@ -14,52 +14,51 @@ log = ion.util.ionlog.getLogger(__name__)
 from twisted.internet import defer
 
 from ion.core.process.process import ProcessFactory
-from ion.core.process.service_process import ServiceProcess, ServiceClient
-from ion.core.intercept.governance_support import GovernanceSupport
+from ion.core.agents.agent_service_process import AgentServiceClient, AgentServiceProcess
 
 AGENT_NAME='org_agent'
 
-class OrgAgentService(ServiceProcess):
+class OrgAgentService(AgentServiceProcess):
     """
     Example service interface
     """
     # Declaration of service
-    declare = ServiceProcess.service_declare(name=AGENT_NAME,
+    declare = AgentServiceProcess.service_declare(name=AGENT_NAME,
                                              version='0.1.0',
                                              dependencies=[])
 
     def __init__(self, *args, **kwargs):
         # Service class initializer. Basic config, but no yields allowed.
-        ServiceProcess.__init__(self, *args, **kwargs)
+        self.AGENT_NAME=AGENT_NAME
+        AgentServiceProcess.__init__(self, *args, **kwargs)
         log.info('OrgAgentService.__init__()')
 
-    def slc_init(self):
-        # Service life cycle state. Initialize service here. Can use yields.
-        self.governance_support = GovernanceSupport(AGENT_NAME)
-    
-        
 
-    @defer.inlineCallbacks
-    def op_enroll(self, content, headers, msg):
-        log.info('enrolling '+headers['user-id'] + ' in org '+headers['receiver-name'])
-        consequent=[headers['user-id'], content['role'], headers['receiver-name']]
-        response={'belief':'enroll','consequent':consequent}
-        yield self.reply_ok(msg, response, {})
+    #@defer.inlineCallbacks
+    def enroll(self, content, headers, msg, user_id, org, role):
+        responses=[]
+        try:
+            role=role[0]
+            responses.append(('enroll',(user_id,org,(role))))
+        except Exception as exception:
+            log.error(exception)
+            responses=None
+        return responses
+        #yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
     def op_sanction(self, content, headers, msg):
 
         op,op_id,sanctioned_user=content
-        consequent=[sanctioned_user, headers['receiver-name']]
-        response={'belief':'eject','consequent':consequent}
-        self.store(response['belief'],response['consequent'])
+        consequent=(sanctioned_user, headers['receiver-name'])
+        response=('eject',consequent)
         yield self.reply_ok(msg, response, {})
 
     @defer.inlineCallbacks
     def op_contribute(self, content, headers, msg):
         log.info(headers['user-id']+' contributing '+str(content['resource_id'])+', action '+ str(content['action'])+ ' to org '+headers['receiver-name'])
-        consequent=[headers['user-id'],content['resource_id'],content['action'],headers['receiver-name']]
-        response={'belief':'contribute','consequent':consequent}
+        consequent=(headers['user-id'],content['resource_id'],content['action'],headers['receiver-name'])
+        response=('contribute',consequent)
 
         yield self.reply_ok(msg, response, {})
 
@@ -109,10 +108,7 @@ class OrgAgentService(ServiceProcess):
                 break
         yield self.reply_ok(msg, response, {})
 
-    def store(self,fact_name,arguments):
-        self.governance_support.store(AGENT_NAME+'_facts',fact_name,arguments)
-
-class OrgAgentServiceClient(ServiceClient):
+class OrgAgentServiceClient(AgentServiceClient):
     """
     This is an exemplar service client that calls the user_agent service. It
     makes service calls RPC style.
@@ -120,17 +116,17 @@ class OrgAgentServiceClient(ServiceClient):
     def __init__(self, proc=None, **kwargs):
         if not 'targetname' in kwargs:
             kwargs['targetname'] = AGENT_NAME
-        ServiceClient.__init__(self, proc, **kwargs)
-        
+        AgentServiceClient.__init__(self, proc, **kwargs)
+
 
     @defer.inlineCallbacks
     def request(self, op, headers=None):
          yield self._check_init()
-         log.info('request headers '+ str(headers))
+         log.debug('request headers '+ str(headers))
          (content, headers, msg) = yield self.rpc_send(op,headers['content'],headers)
          defer.returnValue(content)
 
-    
+
     def request_deferred(self, request=None):
         return self.rpc_send('service_request', request)
 
