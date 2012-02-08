@@ -122,7 +122,7 @@ class OrgAgentServiceClient(AgentServiceClient):
     @defer.inlineCallbacks
     def request(self, op, headers=None):
          yield self._check_init()
-         log.info('request headers '+ str(headers))
+         log.debug('request headers '+ str(headers))
          (content, headers, msg) = yield self.rpc_send(op,headers['content'],headers)
          defer.returnValue(content)
 

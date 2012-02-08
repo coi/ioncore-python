@@ -125,14 +125,14 @@ serviceinstances
 condition_event
 	use condition($a)
 	when
-	    #python print 'condition event', $a
 	    user_agent_facts.event($a)
+	    python print '################### this never gets invoked: condition event', $a
 
 condition_parenthetical_event
 	use condition(($a))
 	when
-	    #python print 'condition parenthetical event', $a
 	    user_agent_facts.event($a)
+	    python print '################### this never gets invoked: condition parenthetical event', $a
 
 condition_true
 	use condition($a)
@@ -158,7 +158,6 @@ condition_stative
 condition_request
 	use condition($a)
 	when
-	    #python print 'check request length',$a,len($a)
 	    check len($a) == 5
 	    python 'check req length',$a,len($a)
 	    python request,op,requester,servicer,parameters=$a
@@ -167,14 +166,15 @@ condition_request
 	    $requester=requester
 	    $servicer=servicer
 	    $parameters=parameters
-	    user_agent_facts.request($request_type,$requester,$servicer,$parameter)
+	    python print 'checking request: ',$request,$op,$requester,$servicer,$parameters
+	    user_agent_facts.request($request_type,$requester,$servicer,$parameters)
+
 
 #example value of $a: ('escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
 #example value in knowledge base:escalate( 'shenrie', 'SCILAB', ('sanction', 'SAN1')))
 predicate_exists
     use condition($a)
     when
-        #python print 'check predicate length',$a,len($a)
         check len($a) == 4
         python op,requester,servicer,arguments=$a
         #$data=data
@@ -183,6 +183,7 @@ predicate_exists
         $requester=requester
         $servicer=servicer
         $arguments=arguments
+        python print 'checking predicate ',$op,$requester,$servicer,$arguments
         user_agent_facts.$op($requester,$servicer,$arguments)
 
 
@@ -242,13 +243,19 @@ condition_norm
 and_condition_event_base_case
 	use condition($a,AND,$b)
 	when
+		python print 'checking first and condition ',$a
 		condition($a)
+		python print 'checking second and condition ',$b
 		condition($b)
+		python print 'checked second and condition '
 and_condition_event_parenthetical_base_case
 	use condition(($a,AND,$b))
 	when
+		python print 'checking first () and condition ',$a
 		condition($a)
+		python print 'checking second () and condition ',$b
 		condition($b)
+		python print 'checked second () and condition '
 ####
 ####AND CONDITIONS
 ####

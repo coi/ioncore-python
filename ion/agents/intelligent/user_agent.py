@@ -56,15 +56,25 @@ class UserAgentService(AgentServiceProcess):
         defer.returnValue(responses)
         #return responses
 
-    @defer.inlineCallbacks
+    #@defer.inlineCallbacks
     def say_hi(self, content, headers, msg,requester,servicer,parameters):
         #(parameters=(prashant)
         responses=[]
-        log.info('Hi ' + parameters)
-        responses.append(('say_hi',('shenrie','SCILAB',('prashant',))))
+        log.info('Hi ' + str(parameters[0]))
+        responses.append(('say_hi',(requester,servicer,(parameters[0],))))
 
-        defer.returnValue(responses)
-        #return responses
+        #defer.returnValue(responses)
+        return responses
+
+    #@defer.inlineCallbacks
+    def press_button(self, content, headers, msg,requester,servicer,parameters):
+        #(parameters=(prashant)
+        responses=[]
+        log.info('pressed button ' + str(parameters[0]))
+        responses.append(('press_button',(requester,servicer,(parameters[0],))))
+
+        #defer.returnValue(responses)
+        return responses
 
     @defer.inlineCallbacks
     def resource_request(self, content, headers, msg, parameters):

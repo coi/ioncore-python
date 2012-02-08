@@ -13,4 +13,4 @@ norm(commitment, COM1, shenrie, shenrie, (request,org_request,shenrie,shenrie,(e
 #authorizations for the org
 norm(authorization, AUTH2, shenrie, SCILAB, true, enroll)
 #things the org_agent is obligated for
-norm(commitment, COM2, SCILAB, shenrie, (request,enroll,shenrie,SCILAB,(student,)), (enroll,shenrie,SCILAB,(student,)))
+norm(commitment, COM4, SCILAB, shenrie, (request,enroll,shenrie,SCILAB,(student,)), (enroll,shenrie,SCILAB,(student,)))

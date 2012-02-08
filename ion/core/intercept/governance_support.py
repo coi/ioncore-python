@@ -42,13 +42,12 @@ class GovernanceSupport():
             try:
 
                 #log.info('updating agent belief to reflect that request was made ')
-                self.store(self.agent+'_facts','request', (op, requester, servicer, headers['content']))
                 log.debug(self.agent + ' checking ' +requester  +' for .authorization($id,'+requester+','+servicer+',$antecedent,'+op+')')
                 vars, plan = self.my_engine.prove_1_goal(self.agent+'.authorization($id,'+requester+','+servicer+',$antecedent,'+op+')')
                 antecedent=vars['antecedent']
                 id=vars['id']
                 log.info('in norm '+id + ' antecedent '+antecedent +' is true thus authorizing '+requester+' to perform ' + op + ' on '+ servicer)
-
+                self.store(self.agent+'_facts','request', (op, requester, servicer, headers['content']))
             except Exception as exception:
                 log.debug(exception)
                 antecedent = DROP
@@ -58,7 +57,7 @@ class GovernanceSupport():
 
     def check_detached_commitments(self,headers):
         consequents = []
-        log.info('headers: ' + str(headers))
+        log.debug('headers: ' + str(headers))
         if 'receiver-name' in headers:
             servicer = headers['receiver-name']
         else:
@@ -77,7 +76,7 @@ class GovernanceSupport():
                         antecedent=vars['antecedent']
                         log.info(id + ' commits '+servicer+'\'s agent to do ' + str(consequent) +' if '+ requester+'\'s agent does '+ str(antecedent))
             except Exception as exception:
-                log.debug(exception)
+                log.error(exception)
                 consequents.append(DROP)
                 log.info('no commitments')
 
@@ -87,7 +86,7 @@ class GovernanceSupport():
 
     def check_pending_sanctions(self,headers):
         consequents=[]
-        log.info('check pending sanctions headers: ' + str(headers) +' in '+self.agent)
+        log.debug('check pending sanctions headers: ' + str(headers) +' in '+self.agent)
         if 'receiver-name' in headers:
             resource_id = headers['receiver-name']
         else:
@@ -95,20 +94,21 @@ class GovernanceSupport():
 
         user_id=headers['user-id']
 
-        consequent='null'
         if self.agent == 'org_agent' or self.agent=='resource_agent' or self.agent=='user_agent':
             try:
                 log.debug(self.agent + ' checking ' +resource_id +' for .pending_sanction($id,'+user_id+','+resource_id+',$antecedent,$consequent) to ' + user_id)
                 with self.my_engine.prove_goal(self.agent+'.pending_sanction($id,'+user_id+',$creditor,$antecedent,$consequent)') as gen:
-                    for var, plan in gen:
-                        consequents.append(vars['consequent'])
+                    for vars, plan in gen:
+                        consequent=vars['consequent']
+                        consequents.append(consequent)
                         id=vars['id']
                         antecedent=vars['antecedent']
                         log.info(id + ' requires '+resource_id+'\'s agent to carry out sanction ' + str(consequent) +' since '+ user_id+'\'s agent '+ str(antecedent))
+                    log.info(self.agent+': no more sanctions')
             except Exception as exception:
                 log.debug(exception)
                 consequents.append(DROP)
-                log.info('no commitments')
+                log.info(self.agent+': no sanctions')
 
         return consequents
 

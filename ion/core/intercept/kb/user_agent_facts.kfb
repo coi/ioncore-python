@@ -4,13 +4,19 @@
 
 #things the simulated user is authorized to do
 norm(authorization, AUTH1, shenrie, shenrie, true, org_request)
-
+norm(authorization, AUTH1, shenrie, shenrie, true, press_button)
 
 #things the simulated user is obligated for
 #if shenrie requests an 'org_request' then do an org_request
-norm(commitment, COM1, shenrie, shenrie, (request,org_request,shenrie,shenrie,(enroll,shenrie,SCILAB,((student,)))), (org_request,shenrie,SCILAB,(enroll,(student,))))
+norm(commitment, COM1, shenrie, shenrie, (request,org_request,shenrie,shenrie,(enroll,shenrie,SCILAB,(student,))), (org_request,shenrie,SCILAB,(enroll,(student,))))
+norm(commitment, COM2, shenrie, shenrie, (request,org_request,shenrie,shenrie,(enroll,shenrie,SCILAB,(student,))), (say_hi,shenrie,SCILAB,(munindar,)))
+norm(commitment, COM3, shenrie, shenrie, (request,press_button,shenrie,shenrie,(true,)), (press_button,shenrie,SCILAB,(true,)))
+
+#things the simulated user will sanction
+norm(sanction, SAN1, shenrie, shenrie, (request,org_request,shenrie,shenrie,(enroll,shenrie,SCILAB,(student,))), (say_hi,shenrie,SCILAB,(prashant,)))
+norm(sanction, SAN2, shenrie, shenrie, ((request,org_request,shenrie,shenrie,(enroll,shenrie,SCILAB,(student,))),AND,(press_button,shenrie,SCILAB,(true))), (say_hi,shenrie,SCILAB,(stephen,)))
 
 #authorizations for the org
 norm(authorization, AUTH2, shenrie, SCILAB, true, enroll)
 #things the org_agent is obligated for
-norm(commitment, COM2, SCILAB, shenrie, (request,enroll,shenrie,SCILAB,(student,)), (enroll,shenrie,SCILAB,(student,)))
+norm(commitment, COM4, SCILAB, shenrie, (request,enroll,shenrie,SCILAB,(student,)), (enroll,shenrie,SCILAB,(student,)))

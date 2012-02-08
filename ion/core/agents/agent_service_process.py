@@ -38,17 +38,17 @@ class AgentServiceProcess(ServiceProcess):
         if headers['performative']!='request':
             log.info(headers['performative'])
         else:
-            responses=yield self.perform_obligations(content, headers, msg)
+            responses=yield self.perform_commitments(content, headers, msg)
             log.info(self.AGENT_NAME +': applying sanctions')
-            #results=yield self.apply_sanctions(content, headers, msg)
-            #responses.extend(results)
+            results=yield self.apply_sanctions(content, headers, msg)
+            responses.extend(results)
             #yield self.reply_ok(msg, responses, {})
             log.info(self.AGENT_NAME + ': returning '+str(responses))
         self.reply_ok(msg, responses, {})
         #defer.returnValue(responses)
 
     @defer.inlineCallbacks
-    def perform_obligations(self, content, headers, msg):
+    def perform_commitments(self, content, headers, msg):
 
         responses = []
         try:
@@ -79,7 +79,7 @@ class AgentServiceProcess(ServiceProcess):
                             log.error(exception)
 
                     responses.extend(results)
-            log.info(self.AGENT_NAME +': No more obligations')
+            log.info(self.AGENT_NAME +': No more commitments')
         except Exception as exception:
                 log.debug(exception)
                 responses.append(exception)
@@ -87,12 +87,14 @@ class AgentServiceProcess(ServiceProcess):
 
 
     @defer.inlineCallbacks
-    def perform_sanctions(self, content, headers, msg):
+    def apply_sanctions(self, content, headers, msg):
 
         responses = []
         try:
             consequents=self.governance_support.check_pending_sanctions(headers)
+            log.debug(self.AGENT_NAME +': consequents of applicable sanctions are '+str(consequents))
             for consequent in consequents:
+                log.debug(self.AGENT_NAME +': a consequent of applicable sanctions is: '+str(consequent))
                 #for parameterized consequents
                 if len(consequent)==4:
                     op,requester,servicer,parameters=consequent
@@ -124,37 +126,6 @@ class AgentServiceProcess(ServiceProcess):
                 responses.append(exception)
         defer.returnValue(responses)
 
-    def apply_sanctionss(self, content, headers, msg):
-        #check for pending_sanctions
-        log.info(self.AGENT_NAME +': checking for sanctions')
-        responses = None
-        try:
-            #consequent example: ('make_request', 'escalate', 'shenrie', 'SCILAB', ('sanction', 'SAN1'))
-            consequents= self.governance_support.check_pending_sanctions(headers)
-            log.debug(self.AGENT_NAME +': consequents of applicable sanctions are '+str(consequents))
-            for consequent in consequents:
-                if len(consequent)==4:
-                    #assumes sanction have consequent that have an operation to be issued by creditor to debtor with parameters
-                    op,creditor,debtor,parameters=consequent
-                    parameters=[creditor,debtor,parameters]
-                elif len(consequent)==1:
-                    #consequent has an operation without parameters
-                    op=consequent
-                    parameters=None
-                else :
-                    op == None
-                    log.error(self.AGENT_NAME +': Error in the way consequent has been declared'+str(consequent))
-                if op != None:
-                    #perform the operation op
-                    response=getattr(self, op)(content, headers, msg, parameters)
-                if response != None:
-                    self.store(response)
-                responses.append(response)
-        except Exception as exception:
-                log.debug(exception)
-                responses.append(exception)
-
-        return self.reply_ok(msg, responses, {})
 
     #sometimes the consequent may simply be creation of another norm
     def norm(self,content,headers,msg,parameters):
